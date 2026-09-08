@@ -76,6 +76,29 @@ people with three or more appraisals**: a trajectory needs three points, and wit
 two every forecast is really last cycle restated. Its current stage is
 `collecting`.
 
+### What each score draws on
+
+Beneath the requirement ledger, the panel lists **every input the score uses**,
+with how many employee records actually carry it — grouped by whether the value
+reaches the score at all:
+
+| State | Meaning |
+|---|---|
+| **Used now** | Read from your records and fed into every score. |
+| **Recorded, not used** | The system already holds it; wiring it in needs no new data entry. |
+| **Not recorded anywhere** | No module produces it, so it cannot be filled in. |
+
+For this surface the appraisal-derived fields matter most, and they are the
+thinnest: *previous cycle's rating* covers 21 of 42 employees and *rating two
+cycles back* covers none until a third cycle closes. *KPI attainment* is flagged
+as repeating the appraisal overall rather than adding to it. Deadline adherence
+and peer feedback are not recorded anywhere.
+
+The middle group is the actionable one, and it is the same finding in all three
+surfaces: attendance rate, days late, approved overtime and training completions
+are recorded daily (the awards board already computes several of them) but are
+not currently among the inputs.
+
 The panel is **frontend-only**: counts are fabricated in the browser and persisted
 to `localStorage`, and no retraining runs behind it. Only the counts are
 simulated — the thresholds and their reasoning are real. Shared implementation

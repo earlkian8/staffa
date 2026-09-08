@@ -1,4 +1,5 @@
 import type {
+    FieldCoverage,
     ModelCheck,
     ModelKey,
     Requirement,
@@ -59,6 +60,7 @@ function isolationRequirement(): Omit<Requirement, 'status'> {
         current: 1,
         required: 1,
         unit: 'configured',
+        unitOne: 'configured',
         summary:
             'Anything built from your records stays yours, and never scores another organisation’s people.',
         basis: 'The application is multi-tenant, so a model trained on one organisation’s history is that organisation’s data. Sharing it across tenants would leak the workforce it learned from.',
@@ -111,6 +113,7 @@ function promotionRequirements(c: Counters): Requirement[] {
             current: c.primary,
             required: PRIMARY_TARGET.promotion,
             unit: 'promotions',
+            unitOne: 'promotion',
             summary:
                 'Past promotions are the examples anything built from your records would learn from.',
             basis: 'A model of this kind needs roughly 10 to 20 recorded outcomes for every piece of information it uses. The readiness score draws on 12, so 120 is the lower bound. Below that, the pattern it finds moves with whichever handful of people happen to be on record.',
@@ -123,7 +126,8 @@ function promotionRequirements(c: Counters): Requirement[] {
             group: 'volume',
             current: c.cycles,
             required: 3,
-            unit: 'cycles',
+            unit: 'review cycles',
+            unitOne: 'review cycle',
             summary:
                 'Readiness leans on appraisal history, so there has to be some history to lean on.',
             basis: 'Two cycles give a current rating and one prior; a third is what separates a trend from a single change. Fewer, and the score is effectively reading one appraisal.',
@@ -136,7 +140,8 @@ function promotionRequirements(c: Counters): Requirement[] {
             group: 'volume',
             current: holdout,
             required: 25,
-            unit: 'people',
+            unit: 'people held back for testing',
+            unitOne: 'person held back for testing',
             summary:
                 'A group set aside and never learned from, used to check the result actually works.',
             basis: 'A fifth of the records are held back. Under about 25 people a test result swings on one or two individuals, so it cannot tell a good result from a lucky one.',
@@ -149,7 +154,8 @@ function promotionRequirements(c: Counters): Requirement[] {
             group: 'quality',
             current: Math.min(c.primary, EMPLOYEES - c.primary),
             required: 30,
-            unit: 'people',
+            unit: 'people in the smaller group',
+            unitOne: 'person in the smaller group',
             summary:
                 'Both answers — promoted and not promoted — have to appear often enough to tell apart.',
             basis: 'When one outcome is rare, the safest guess is always the common one, and the model stops distinguishing anybody. Thirty is the point at which the rarer group carries enough signal to resist that.',
@@ -162,7 +168,8 @@ function promotionRequirements(c: Counters): Requirement[] {
             group: 'quality',
             current: Math.min(c.cycles, 2),
             required: 3,
-            unit: 'cycles',
+            unit: 'cycles on one appraisal form',
+            unitOne: 'cycle on one appraisal form',
             summary:
                 'Ratings only compare across cycles if the form did not change underneath them.',
             basis: 'Appraisal frameworks are configurable per organisation, which is deliberate — but it means a 4.0 measured on one form is not the same fact as a 4.0 on another. Learning across an edit teaches the form change, not the people.',
@@ -175,7 +182,8 @@ function promotionRequirements(c: Counters): Requirement[] {
             group: 'quality',
             current: EMPLOYEES,
             required: EMPLOYEES,
-            unit: 'scores',
+            unit: 'scores matched to an outcome',
+            unitOne: 'score matched to an outcome',
             summary:
                 'Every score already stored is matched to whether that person was later promoted.',
             basis: 'Without this link there is nothing to learn from later, however much time passes. It is the one requirement that has to hold from day one, because history cannot be reconstructed after the fact.',
@@ -201,7 +209,8 @@ function performanceRequirements(c: Counters): Requirement[] {
             group: 'volume',
             current: c.primary,
             required: PRIMARY_TARGET.performance,
-            unit: 'comparisons',
+            unit: 'cycle-to-cycle comparisons',
+            unitOne: 'cycle-to-cycle comparison',
             summary:
                 'One comparison is a person’s rating in one cycle set beside their rating in the next.',
             basis: 'Each pair of consecutive cycles yields one example per appraised employee. Predicting a number rather than a yes/no needs more examples than a classifier, and about 200 is where the error stops being dominated by how the split happened to fall.',
@@ -214,7 +223,8 @@ function performanceRequirements(c: Counters): Requirement[] {
             group: 'volume',
             current: c.cycles,
             required: 4,
-            unit: 'cycles',
+            unit: 'review cycles',
+            unitOne: 'review cycle',
             summary:
                 'Forecasting the next cycle from this one needs several finished cycles to compare.',
             basis: 'Three consecutive cycles give two comparisons in sequence, which is the minimum for a direction of travel; the fourth is held back so the result can be tested on a cycle it never saw.',
@@ -227,7 +237,8 @@ function performanceRequirements(c: Counters): Requirement[] {
             group: 'volume',
             current: holdout,
             required: 40,
-            unit: 'comparisons',
+            unit: 'comparisons held back for testing',
+            unitOne: 'comparison held back for testing',
             summary:
                 'A slice set aside and never learned from, used to check the forecast actually works.',
             basis: 'A fifth of the comparisons are held back. Below about 40, the average error moves more with which comparisons landed in the test than with how good the forecast is.',
@@ -240,7 +251,8 @@ function performanceRequirements(c: Counters): Requirement[] {
             group: 'quality',
             current: trendDepth,
             required: 30,
-            unit: 'people',
+            unit: 'people with three or more appraisals',
+            unitOne: 'person with three or more appraisals',
             summary:
                 'A trajectory needs three points. With two, every forecast is really last year restated.',
             basis: 'The forecast leans hardest on the previous rating. Without a third appraisal there is no way to tell someone climbing from someone who has plateaued at the same level, so the forecast cannot improve on simply repeating the last score.',
@@ -253,7 +265,8 @@ function performanceRequirements(c: Counters): Requirement[] {
             group: 'quality',
             current: Math.min(c.cycles, 2),
             required: 3,
-            unit: 'cycles',
+            unit: 'cycles on one appraisal form',
+            unitOne: 'cycle on one appraisal form',
             summary:
                 'Ratings only compare across cycles if the form did not change underneath them.',
             basis: 'Appraisal frameworks are configurable per organisation, which is deliberate — but it means a 4.0 measured on one form is not the same fact as a 4.0 on another. A forecast learned across an edit is tracking the form, not the person.',
@@ -266,7 +279,8 @@ function performanceRequirements(c: Counters): Requirement[] {
             group: 'quality',
             current: EMPLOYEES,
             required: EMPLOYEES,
-            unit: 'forecasts',
+            unit: 'forecasts matched to a rating',
+            unitOne: 'forecast matched to a rating',
             summary:
                 'Every forecast already stored is matched to the rating the person actually received.',
             basis: 'Without this link there is nothing to learn from later, however much time passes. It is the one requirement that has to hold from day one, because history cannot be reconstructed after the fact.',
@@ -291,6 +305,7 @@ function attritionRequirements(c: Counters): Requirement[] {
             current: c.primary,
             required: PRIMARY_TARGET.attrition,
             unit: 'departures',
+            unitOne: 'departure',
             summary:
                 'People who have actually left are the examples anything built from your records would learn from.',
             basis: 'A model of this kind needs roughly 10 to 20 recorded outcomes for every piece of information it uses. Around 80 departures is the lower bound for the signals this surface shows — and a stable organisation produces them slowly, which is precisely why this gate is the hardest of the three to open.',
@@ -303,7 +318,8 @@ function attritionRequirements(c: Counters): Requirement[] {
             group: 'volume',
             current: 24,
             required: 24,
-            unit: 'months',
+            unit: 'months of headcount history',
+            unitOne: 'month of headcount history',
             summary:
                 'Enough elapsed time for leaving and staying to both be observable.',
             basis: 'Flight risk is a question about the future, so the records have to span long enough that people who stayed are genuinely distinguishable from people who had not left yet. Two years is the shortest window that holds.',
@@ -315,7 +331,8 @@ function attritionRequirements(c: Counters): Requirement[] {
             group: 'volume',
             current: holdout,
             required: 20,
-            unit: 'people',
+            unit: 'people held back for testing',
+            unitOne: 'person held back for testing',
             summary:
                 'A group set aside and never learned from, used to check the result actually works.',
             basis: 'A fifth of the records are held back. Under about 20 people a test result swings on one or two individuals, so it cannot tell a good result from a lucky one.',
@@ -328,7 +345,8 @@ function attritionRequirements(c: Counters): Requirement[] {
             group: 'quality',
             current: c.primary,
             required: 30,
-            unit: 'people',
+            unit: 'people in the smaller group',
+            unitOne: 'person in the smaller group',
             summary:
                 'Both answers — left and stayed — have to appear often enough to tell apart.',
             basis: 'Departures are the rare outcome by a wide margin. When one answer is rare, the safest guess is always the common one, and the model stops distinguishing anybody.',
@@ -341,7 +359,8 @@ function attritionRequirements(c: Counters): Requirement[] {
             group: 'quality',
             current: Math.max(0, c.primary - 2),
             required: c.primary,
-            unit: 'departures',
+            unit: 'departures with a recorded reason',
+            unitOne: 'departure with a recorded reason',
             summary:
                 'A resignation and a redundancy are different events and cannot be learned from together.',
             basis: 'Voluntary and involuntary exits have opposite meanings for flight risk. Mixing them teaches the model to predict headcount change rather than the decision to leave, so every departure needs a recorded reason before any of them is usable.',
@@ -354,7 +373,8 @@ function attritionRequirements(c: Counters): Requirement[] {
             group: 'quality',
             current: 0,
             required: EMPLOYEES,
-            unit: 'scores',
+            unit: 'scores matched to an outcome',
+            unitOne: 'score matched to an outcome',
             summary:
                 'Nothing shown here is stored, so none of it can be matched to who actually left.',
             basis: 'This surface generates its scores in the browser and keeps no server-side record, so there is nothing to compare against later. Until scores are persisted and matched to outcomes, no amount of elapsed time moves this surface closer to a model of its own.',
@@ -467,6 +487,303 @@ function cycleOutlook(current: number, required: number): string {
     return `Cycles close about twice a year, so ${remaining} more is roughly ${months} months away.`;
 }
 
+/*
+ * Field coverage: every input a score draws on, how many employee records
+ * actually carry it, and whether it reaches the score at all.
+ *
+ * The three states are the honest ones. `supplied` is fed in today. `available`
+ * is the uncomfortable middle — the system records it, the score does not use it
+ * yet. `missing` is a field no module produces, so no amount of data entry fixes
+ * it. A count alone would hide that distinction, and it is the distinction that
+ * tells someone what to do next.
+ */
+
+/** Employee-record fields every surface reads, always complete on an active record. */
+function coreFields(): FieldCoverage[] {
+    return [
+        {
+            key: 'date_hired',
+            label: 'Hire date',
+            source: 'Employee record',
+            state: 'supplied',
+            covered: EMPLOYEES,
+            total: EMPLOYEES,
+            note: 'Mandatory on every employee, so tenure is always available.',
+        },
+        {
+            key: 'employment_type',
+            label: 'Employment type',
+            source: 'Employee record',
+            state: 'supplied',
+            covered: EMPLOYEES,
+            total: EMPLOYEES,
+            note: 'Regular, probationary, part-time or contractual.',
+        },
+        {
+            key: 'department',
+            label: 'Department',
+            source: 'Employee record',
+            state: 'supplied',
+            covered: EMPLOYEES,
+            total: EMPLOYEES,
+            note: 'Every employee belongs to one.',
+        },
+        {
+            key: 'salary',
+            label: 'Monthly salary',
+            source: 'Employee record',
+            state: 'supplied',
+            covered: EMPLOYEES,
+            total: EMPLOYEES,
+            note: 'Set at hiring and kept current through promotions.',
+        },
+    ];
+}
+
+/** Appraisal-derived fields, whose coverage follows how many cycles have closed. */
+function appraisalFields(c: Counters): FieldCoverage[] {
+    const latest = 35;
+    const prior = c.cycles >= 2 ? EMPLOYEES_WITH_HISTORY : 0;
+    const older = c.cycles >= 3 ? EMPLOYEES_WITH_HISTORY : 0;
+
+    return [
+        {
+            key: 'rating_latest',
+            label: 'Latest appraisal rating',
+            source: 'Performance',
+            state: 'supplied',
+            covered: latest,
+            total: EMPLOYEES,
+            note: `${EMPLOYEES - latest} employees have no scored appraisal yet, so their score leans on tenure and department alone.`,
+        },
+        {
+            key: 'rating_prior',
+            label: 'Previous cycle’s rating',
+            source: 'Performance',
+            state: 'supplied',
+            covered: prior,
+            total: EMPLOYEES,
+            note:
+                prior === 0
+                    ? 'No second closed cycle exists yet, so nobody has a prior rating.'
+                    : `Only ${prior} employees have been appraised in two closed cycles.`,
+        },
+        {
+            key: 'rating_older',
+            label: 'Rating two cycles back',
+            source: 'Performance',
+            state: 'supplied',
+            covered: older,
+            total: EMPLOYEES,
+            note:
+                older === 0
+                    ? 'Needs a third closed cycle before anybody has one.'
+                    : `${older} employees now carry three cycles of history.`,
+        },
+    ];
+}
+
+/** Attendance and training figures the system records but does not feed in yet. */
+function unfedOperationalFields(): FieldCoverage[] {
+    return [
+        {
+            key: 'attendance_rate',
+            label: 'Attendance rate, last 90 days',
+            source: 'Attendance',
+            state: 'available',
+            covered: EMPLOYEES,
+            total: EMPLOYEES,
+            note: 'Recorded daily and already computed for the awards board — it is simply not one of the inputs yet.',
+        },
+        {
+            key: 'late_days',
+            label: 'Days late, last 90 days',
+            source: 'Attendance',
+            state: 'available',
+            covered: EMPLOYEES,
+            total: EMPLOYEES,
+            note: 'Derived on every attendance record; not currently fed in.',
+        },
+        {
+            key: 'overtime',
+            label: 'Approved overtime, last 90 days',
+            source: 'Attendance',
+            state: 'available',
+            covered: EMPLOYEES,
+            total: EMPLOYEES,
+            note: 'Approved overtime minutes are stored per day; not currently fed in.',
+        },
+        {
+            key: 'training',
+            label: 'Trainings completed, last 12 months',
+            source: 'Training & Development',
+            state: 'available',
+            covered: 31,
+            total: EMPLOYEES,
+            note: `Enrolments and completions are tracked; ${EMPLOYEES - 31} employees have none on record.`,
+        },
+    ];
+}
+
+function promotionFields(c: Counters): FieldCoverage[] {
+    return [
+        ...coreFields(),
+        ...appraisalFields(c),
+        {
+            key: 'promotion_history',
+            label: 'Promotion history',
+            source: 'Employee 201 file',
+            state: 'supplied',
+            covered: 28,
+            total: EMPLOYEES,
+            note: 'Employees with no recorded promotion fall back to total tenure, which is a substitute rather than a fact.',
+        },
+        {
+            key: 'certifications',
+            label: 'Certifications',
+            source: 'Employee 201 file',
+            state: 'supplied',
+            covered: 29,
+            total: EMPLOYEES,
+            note: 'A count of certification records; zero is a real answer here, not a gap.',
+        },
+        ...unfedOperationalFields(),
+        {
+            key: 'peer_feedback',
+            label: 'Peer feedback',
+            source: '—',
+            state: 'missing',
+            covered: 0,
+            total: EMPLOYEES,
+            note: 'No module collects peer or 360-degree feedback, so this cannot be filled in by data entry.',
+        },
+        {
+            key: 'engagement',
+            label: 'Engagement and job satisfaction',
+            source: '—',
+            state: 'missing',
+            covered: 0,
+            total: EMPLOYEES,
+            note: 'The system runs no engagement survey, so there is nothing to read.',
+        },
+    ];
+}
+
+function performanceFields(c: Counters): FieldCoverage[] {
+    const kpi = 35;
+
+    return [
+        ...coreFields(),
+        ...appraisalFields(c),
+        {
+            key: 'kpi_attainment',
+            label: 'KPI attainment per cycle',
+            source: 'Performance',
+            state: 'supplied',
+            covered: kpi,
+            total: EMPLOYEES,
+            note: 'Currently derived from the same appraisal overall as the rating, so it repeats that figure rather than adding to it.',
+        },
+        {
+            key: 'certifications',
+            label: 'Certifications',
+            source: 'Employee 201 file',
+            state: 'supplied',
+            covered: 29,
+            total: EMPLOYEES,
+            note: 'A count of certification records.',
+        },
+        ...unfedOperationalFields(),
+        {
+            key: 'deadline_adherence',
+            label: 'Deadline adherence',
+            source: '—',
+            state: 'missing',
+            covered: 0,
+            total: EMPLOYEES,
+            note: 'No project or task tracking exists in the system, so delivery reliability cannot be measured.',
+        },
+        {
+            key: 'peer_feedback',
+            label: 'Peer feedback',
+            source: '—',
+            state: 'missing',
+            covered: 0,
+            total: EMPLOYEES,
+            note: 'No module collects peer or 360-degree feedback.',
+        },
+    ];
+}
+
+function attritionFields(c: Counters): FieldCoverage[] {
+    // Nothing is fed here at all — the scores are illustrative — so every field
+    // the system does hold is 'available' rather than 'supplied'.
+    const core = coreFields().map((field) => ({
+        ...field,
+        state: 'available' as const,
+        note: `${field.note} Not fed in — this surface has no model.`,
+    }));
+
+    return [
+        ...core,
+        ...unfedOperationalFields(),
+        {
+            key: 'since_promotion',
+            label: 'Time since last promotion',
+            source: 'Employee 201 file',
+            state: 'available',
+            covered: 28,
+            total: EMPLOYEES,
+            note: 'Recorded for employees with a promotion on file; the rest fall back to tenure.',
+        },
+        {
+            key: 'departure_reason',
+            label: 'Departure reason',
+            source: 'Offboarding',
+            state: 'available',
+            covered: Math.max(0, c.primary - 2),
+            total: c.primary,
+            note: 'Counted against departures rather than headcount. Voluntary and involuntary exits mean opposite things, so every departure needs one.',
+        },
+        {
+            key: 'exit_interview',
+            label: 'Exit interview notes',
+            source: '—',
+            state: 'missing',
+            covered: 0,
+            total: c.primary,
+            note: 'Offboarding records no structured exit interview, so the stated reason is all there is.',
+        },
+        {
+            key: 'engagement',
+            label: 'Engagement and job satisfaction',
+            source: '—',
+            state: 'missing',
+            covered: 0,
+            total: EMPLOYEES,
+            note: 'The strongest published predictor of leaving, and the system runs no survey that would produce it.',
+        },
+        {
+            key: 'pay_benchmark',
+            label: 'Pay against market rate',
+            source: '—',
+            state: 'missing',
+            covered: 0,
+            total: EMPLOYEES,
+            note: 'Salary is recorded, but nothing compares it to a market benchmark.',
+        },
+    ];
+}
+
+const FIELD_BUILDERS: Record<
+    ModelKey,
+    (counters: Counters) => FieldCoverage[]
+> = {
+    promotion: promotionFields,
+    performance: performanceFields,
+    attrition: attritionFields,
+};
+
 let checkCounter = 0;
 
 /** Build a check for one surface (not persisted — see {@link runCheck}). */
@@ -485,6 +802,8 @@ function generateCheck(model: ModelKey, counters: Counters): ModelCheck {
         met_count: requirements.filter((r) => r.status === 'met').length,
         total_count: requirements.length,
         binding_key: binding?.key ?? '',
+        fields: FIELD_BUILDERS[model](counters),
+        employees: EMPLOYEES,
     };
 }
 

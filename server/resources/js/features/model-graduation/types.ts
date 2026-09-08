@@ -28,8 +28,13 @@ export type Requirement = {
     group: RequirementGroup;
     current: number;
     required: number;
-    /** Plural noun for the count, e.g. "promotions". */
+    /**
+     * What the count is *of*, phrased specifically enough to stand alone in a
+     * chip — "people held back for testing", not "people". Plural form.
+     */
     unit: string;
+    /** The singular form, used when exactly one is outstanding. */
+    unitOne: string;
     status: RequirementStatus;
     /** One line on what this requirement protects against, in plain language. */
     summary: string;
@@ -48,6 +53,31 @@ export type Requirement = {
     outlook?: string;
 };
 
+/**
+ * Whether a field reaches the score today.
+ *
+ * `supplied` — read from your records and fed into every score.
+ * `available` — the system already records it, but it is not fed in yet.
+ * `missing`   — nothing in the system produces it, so it cannot be fed at all.
+ */
+export type FieldState = 'supplied' | 'available' | 'missing';
+
+/** How completely one input field is filled in across the workforce. */
+export type FieldCoverage = {
+    key: string;
+    /** The field in the user's words, not the model's column name. */
+    label: string;
+    /** Which part of the system the value comes from. */
+    source: string;
+    state: FieldState;
+    /** Employees whose record carries a usable value. */
+    covered: number;
+    /** Employees in scope. */
+    total: number;
+    /** What the gap means, or why the field cannot be fed yet. */
+    note: string;
+};
+
 /** One readiness check for one surface: every requirement, plus the verdict. */
 export type ModelCheck = {
     model: ModelKey;
@@ -62,4 +92,8 @@ export type ModelCheck = {
      * acted on directly — what actually blocks.
      */
     binding_key: string;
+    /** Per-field record coverage across the workforce. */
+    fields: FieldCoverage[];
+    /** Employees in scope for the coverage figures. */
+    employees: number;
 };

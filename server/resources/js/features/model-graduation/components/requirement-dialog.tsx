@@ -11,6 +11,7 @@ import {
     completion,
     formatProgress,
     STATUS_BARS,
+    pluralise,
     STATUS_LABELS,
     STATUS_STYLES,
 } from '../constants';
@@ -101,7 +102,7 @@ function Progress({ requirement }: { requirement: Requirement }) {
             <p className="mt-2.5 text-xs text-muted-foreground">
                 {requirement.status === 'met'
                     ? 'Satisfied — this requirement no longer blocks retraining.'
-                    : `${remaining.toLocaleString()} more ${requirement.unit} needed.`}
+                    : `${remaining.toLocaleString()} more ${pluralise(remaining, requirement.unit, requirement.unitOne)} needed.`}
             </p>
         </div>
     );

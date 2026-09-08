@@ -68,6 +68,23 @@ and never stored, so the prediction-to-outcome link is at zero — and that, not
 elapsed time, is what blocks it. Waiting does not move that requirement, which is
 why it reads `provisional` where the other two read `collecting`.
 
+**The panel quantifies data, not only time.** A projection in years answers
+*when*; it does not say what is actually thin. Alongside the requirement ledger
+the panel therefore shows two more things:
+
+- **Still needed** — every outstanding shortfall as a bare count
+  (`106 more promotions`, `1 more review cycle`, `23 more people held back for
+  testing`), with directly-collected gaps highlighted and derived ones muted.
+- **What each score draws on** — every input field with its record coverage
+  (`Latest appraisal rating · Performance · 35 / 42 · 83%`), grouped into **used
+  now**, **recorded but not used**, and **not recorded anywhere**.
+
+That third grouping is the one that changes what a reader does next. A field the
+system does not produce cannot be fixed by data entry; a field that is fully
+recorded but never fed in needs no data entry at all, only wiring. Attendance
+rate, days late, approved overtime and training completions all sit in that middle
+group today — recorded daily, and absent from every score.
+
 **Two rules keep the panel truthful:**
 
 - **The blocker is chosen among requirements that can be acted on directly.**
@@ -77,6 +94,9 @@ why it reads `provisional` where the other two read `collecting`.
 - **The number and the sentence explaining it always describe the same
   requirement.** Each actionable requirement carries its own `outlook`, and the
   panel renders the blocker's own.
+- **Counts name what they count.** Units are specific enough to stand alone
+  ("people held back for testing", not "people") and carry a singular form, so no
+  two shortfall chips read alike and none says "1 more cycles".
 
 Following ADR 0030, the whole thing is **frontend-only**: no controller, no
 migration, no permission, no retraining job, no route and no sidebar entry.
@@ -102,6 +122,10 @@ is in effect a specification of the gate an implementation would have to enforce
   made appraisal frameworks configurable per tenant, which is right for the
   product but means scores are not automatically comparable across cycles. The
   requirement names that cost rather than hiding it.
+- **Field coverage doubles as a data-quality report.** It states, per surface,
+  which inputs are thin and which are absent — including that three of promotion's
+  appraisal-derived inputs currently repeat one appraisal overall between them,
+  and that `rating two cycles back` is at zero coverage until a third cycle closes.
 - **No backend surface area is added** — no tables, permissions or queue workers,
   none of which would earn their keep while the gate cannot open.
 - **If retraining is ever built**, these panels are its precondition: the

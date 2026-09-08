@@ -61,6 +61,28 @@ requirement, so this surface reads `provisional` where the other two read
 `collecting`. Its headline requirement is **80 recorded departures**, which a
 stable organisation produces slowest of all.
 
+### What each score draws on
+
+Beneath the requirement ledger, the panel lists **every input the score uses**,
+with how many employee records actually carry it — grouped by whether the value
+reaches the score at all:
+
+| State | Meaning |
+|---|---|
+| **Used now** | Read from your records and fed into every score. |
+| **Recorded, not used** | The system already holds it; wiring it in needs no new data entry. |
+| **Not recorded anywhere** | No module produces it, so it cannot be filled in. |
+
+This surface has **no "Used now" group at all** — nothing is fed in, because there
+is no model. Departure-scoped fields count against departures rather than
+headcount, so *departure reason* reads 4 of 6 and *exit interview notes* 0 of 6.
+Engagement, exit interviews and pay-against-market are not recorded anywhere.
+
+The middle group is the actionable one, and it is the same finding in all three
+surfaces: attendance rate, days late, approved overtime and training completions
+are recorded daily (the awards board already computes several of them) but are
+not currently among the inputs.
+
 The panel is **frontend-only**: counts are fabricated in the browser and persisted
 to `localStorage`, and no retraining runs behind it. Only the counts are
 simulated — the thresholds and their reasoning are real. Shared implementation

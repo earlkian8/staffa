@@ -13,6 +13,7 @@ import {
     formatProgress,
     formatRelative,
     MODEL_COPY,
+    pluralise,
     STAGE_LABELS,
 } from '../constants';
 import {
@@ -21,7 +22,8 @@ import {
     runCheck,
     subscribe,
 } from '../mock-engine';
-import type { ModelKey, Requirement } from '../types';
+import type { ModelCheck, ModelKey, Requirement } from '../types';
+import { FieldCoverageTable } from './field-coverage';
 import { RequirementDialog } from './requirement-dialog';
 import { RequirementLedger } from './requirement-ledger';
 import { StageRail } from './stage-rail';
@@ -125,11 +127,15 @@ export function ModelProvenance({ model }: { model: ModelKey }) {
 
                         {binding && <BindingConstraint binding={binding} />}
 
+                        <StillNeeded check={check} />
+
                         <RequirementLedger
                             requirements={check.requirements}
                             bindingKey={check.binding_key}
                             onOpen={setDetail}
                         />
+
+                        <FieldCoverageTable fields={check.fields} />
 
                         <div className="flex flex-wrap items-center justify-between gap-2">
                             <p className="flex items-start gap-2 text-xs text-muted-foreground">
@@ -187,6 +193,60 @@ function StageBadge({
         >
             {label}
         </span>
+    );
+}
+
+/**
+ * Every outstanding shortfall as a bare quantity, so the reader can see at a
+ * glance how much of each kind of record is still missing rather than only how
+ * long it would take. Derived shortfalls are included here — they are real gaps
+ * even though nobody can close them directly — and marked as following on.
+ */
+function StillNeeded({ check }: { check: ModelCheck }) {
+    const gaps = check.requirements
+        .filter((r) => r.status !== 'met')
+        .map((r) => ({
+            key: r.key,
+            amount: r.required - r.current,
+            unit: pluralise(r.required - r.current, r.unit, r.unitOne),
+            derived: r.derived === true,
+        }))
+        .sort((a, b) => Number(a.derived) - Number(b.derived));
+
+    if (gaps.length === 0) {
+        return null;
+    }
+
+    return (
+        <div>
+            <span className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+                Still needed
+            </span>
+
+            <ul className="mt-2 flex flex-wrap gap-1.5">
+                {gaps.map((gap) => (
+                    <li
+                        key={gap.key}
+                        className={cn(
+                            'rounded-full border px-2.5 py-1 text-xs',
+                            gap.derived
+                                ? 'border-sidebar-border/70 bg-muted text-muted-foreground dark:border-sidebar-border'
+                                : 'border-[#0ABFBF]/30 bg-[#0ABFBF]/10 text-foreground',
+                        )}
+                    >
+                        <span className="font-semibold tabular-nums">
+                            {gap.amount.toLocaleString()}
+                        </span>{' '}
+                        more {gap.unit}
+                    </li>
+                ))}
+            </ul>
+
+            <p className="mt-2 text-xs text-muted-foreground">
+                Highlighted counts are collected directly. The muted ones follow
+                on as those accumulate — they need no separate effort.
+            </p>
+        </div>
     );
 }
 

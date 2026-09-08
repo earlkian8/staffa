@@ -1,4 +1,5 @@
 import type {
+    FieldState,
     ModelKey,
     RequirementGroup,
     RequirementStatus,
@@ -102,6 +103,45 @@ export const GROUP_LABELS: Record<RequirementGroup, string> = {
 /** Groups in display order. */
 export const GROUP_ORDER: RequirementGroup[] = ['volume', 'quality', 'system'];
 
+/**
+ * Field states, ordered so the reader meets what works before what is missing.
+ * `available` sits in the middle deliberately: it is the most actionable of the
+ * three, because the data already exists and only the wiring is absent.
+ */
+export const FIELD_STATE_ORDER: FieldState[] = [
+    'supplied',
+    'available',
+    'missing',
+];
+
+export const FIELD_STATE_LABELS: Record<FieldState, string> = {
+    supplied: 'Used now',
+    available: 'Recorded, not used',
+    missing: 'Not recorded anywhere',
+};
+
+export const FIELD_STATE_HINTS: Record<FieldState, string> = {
+    supplied: 'Read from your records and fed into every score.',
+    available:
+        'The system already holds these — wiring them in needs no new data entry.',
+    missing:
+        'No part of the system produces these, so they cannot be filled in.',
+};
+
+export const FIELD_STATE_STYLES: Record<FieldState, string> = {
+    supplied:
+        'border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
+    available: 'border-[#0ABFBF]/30 bg-[#0ABFBF]/10 text-[#0ABFBF]',
+    missing:
+        'border-sidebar-border/70 bg-muted text-muted-foreground dark:border-sidebar-border',
+};
+
+export const FIELD_STATE_BARS: Record<FieldState, string> = {
+    supplied: 'bg-emerald-500',
+    available: 'bg-[#0ABFBF]',
+    missing: 'bg-muted-foreground/30',
+};
+
 /** Format a count against its requirement, e.g. "14 / 120". */
 export function formatProgress(current: number, required: number): string {
     return `${current.toLocaleString()} / ${required.toLocaleString()}`;
@@ -114,6 +154,15 @@ export function completion(current: number, required: number): number {
     }
 
     return Math.min(100, Math.round((current / required) * 100));
+}
+
+/** Pick the singular or plural wording for a count. */
+export function pluralise(
+    amount: number,
+    unit: string,
+    unitOne: string,
+): string {
+    return amount === 1 ? unitOne : unit;
 }
 
 /** Compact relative time, e.g. "3h ago", "2d ago". */

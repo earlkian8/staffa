@@ -67,6 +67,28 @@ to 20 recorded outcomes for each of the 12 inputs the readiness score draws on.
 Its current stage is `collecting`: stored scores are matched back to who was
 actually promoted, so time spent now counts toward a future local model.
 
+### What each score draws on
+
+Beneath the requirement ledger, the panel lists **every input the score uses**,
+with how many employee records actually carry it — grouped by whether the value
+reaches the score at all:
+
+| State | Meaning |
+|---|---|
+| **Used now** | Read from your records and fed into every score. |
+| **Recorded, not used** | The system already holds it; wiring it in needs no new data entry. |
+| **Not recorded anywhere** | No module produces it, so it cannot be filled in. |
+
+For this surface, 9 fields are used now — hire date, employment type, department
+and salary at 100% coverage, but *latest appraisal rating* at 35 of 42, *previous
+cycle's rating* at 21 of 42, and *rating two cycles back* at 0 of 42 until a third
+cycle closes. Peer feedback and engagement are not recorded anywhere.
+
+The middle group is the actionable one, and it is the same finding in all three
+surfaces: attendance rate, days late, approved overtime and training completions
+are recorded daily (the awards board already computes several of them) but are
+not currently among the inputs.
+
 The panel is **frontend-only**: counts are fabricated in the browser and persisted
 to `localStorage`, and no retraining runs behind it. Only the counts are
 simulated — the thresholds and their reasoning are real. Shared implementation
