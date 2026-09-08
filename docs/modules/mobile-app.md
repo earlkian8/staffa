@@ -110,7 +110,19 @@ require approval — identical to the web `LeaveRequestController`.
   `/me` on boot. `login` / `switchTo` / `logout` / `refresh`; `switchTo` swaps in a
   token bound to the chosen company. `lib/active-workspace.ts` republishes the active
   org id so `lib/use-query.ts` refetches on a switch.
-- `theme/` — design tokens (navy `#0F2044`, teal `#0ABFBF`, shared status colours),
-  light + dark.
+- `theme/` — design tokens, light + dark, kept in lock-step with the web app's
+  `resources/css/app.css`. **White is the app's primary colour**, as it is in the ERP's
+  signed-in shell: white page and cards separated by the ERP's own neutral hairlines
+  (its `oklch()` greys converted to sRGB — the Tailwind `neutral` ramp), near-black
+  `primary` for anything you press, and the brand teal `#0ABFBF` held back for one job,
+  marking what is active. Navy `#0F2044` is the *pre-app* field only — sign-in,
+  register, splash and the workspace picker — and appears nowhere behind the app itself.
+  `theme/color.ts` carries the colour maths: sRGB ⇄ OKLCH, WCAG contrast, and
+  `readableOn()`, which walks a colour's lightness until it can legibly carry text on a
+  given surface. Status tones and the colours HR picks for leave and award types are
+  rendered through `readable()` from `useTheme()` rather than painted raw, so a
+  tenant-chosen colour can never land as 2.5:1 text on a white card. `FixedScheme` pins
+  one subtree to a scheme, for the sign-in card that stays white whatever the phone's
+  appearance setting says.
 - `components/ui/` — the shared kit (Button, Card, Pill, Input, Sheet, Toast, …).
 - `features/<module>/` — `api.ts` + components, mirroring the web feature folders.

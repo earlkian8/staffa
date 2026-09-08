@@ -15,6 +15,7 @@ import { formatDate } from '@/lib/format';
 import { leaveMeta } from '@/lib/status';
 import { useQuery } from '@/lib/use-query';
 import { useTheme } from '@/theme/theme';
+import { status as statusTones } from '@/theme/tokens';
 import type { LeaveBalance, LeaveRequest, LeaveStatus } from '@/types/api';
 
 type LeaveData = { balances: LeaveBalance[]; requests: LeaveRequest[] };
@@ -28,7 +29,7 @@ const FILTERS: { value: Filter; label: string }[] = [
 ];
 
 export default function RequestsScreen() {
-  const { colors, spacing } = useTheme();
+  const { colors, spacing, readable } = useTheme();
   const router = useRouter();
   const [filter, setFilter] = useState<Filter>('all');
 
@@ -47,18 +48,20 @@ export default function RequestsScreen() {
         right={
           <Pressable
             onPress={() => router.push('/leave/new')}
+            accessibilityRole="button"
+            accessibilityLabel="File a leave request"
             style={{
               flexDirection: 'row',
               alignItems: 'center',
               gap: 4,
-              backgroundColor: colors.accent,
+              backgroundColor: colors.primary,
               paddingHorizontal: 14,
               paddingVertical: 9,
               borderRadius: 999,
             }}
           >
-            <Ionicons name="add" size={18} color={colors.onAccent} />
-            <AppText variant="label" style={{ color: colors.onAccent }}>
+            <Ionicons name="add" size={18} color={colors.onPrimary} />
+            <AppText variant="label" style={{ color: colors.onPrimary }}>
               File
             </AppText>
           </Pressable>
@@ -82,7 +85,14 @@ export default function RequestsScreen() {
               {(data?.balances ?? []).map((balance) => (
                 <Card key={balance.leave_type_id} style={{ width: '47%', gap: 4 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                    <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: balance.color ?? colors.accent }} />
+                    <View
+                      style={{
+                        width: 8,
+                        height: 8,
+                        borderRadius: 4,
+                        backgroundColor: readable(balance.color ?? colors.accent, colors.card, 3),
+                      }}
+                    />
                     <AppText variant="caption" muted numberOfLines={1} style={{ flex: 1 }}>
                       {balance.name}
                     </AppText>
@@ -94,7 +104,7 @@ export default function RequestsScreen() {
                     </AppText>
                   </View>
                   {balance.pending > 0 && (
-                    <AppText variant="caption" style={{ color: '#F59E0B' }}>
+                    <AppText variant="caption" style={{ color: readable(statusTones.late) }}>
                       {balance.pending} pending
                     </AppText>
                   )}
@@ -117,16 +127,18 @@ export default function RequestsScreen() {
                 <Pressable
                   key={f.value}
                   onPress={() => setFilter(f.value)}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: active }}
                   style={{
                     paddingHorizontal: 14,
                     paddingVertical: 7,
                     borderRadius: 999,
-                    backgroundColor: active ? colors.accent : colors.card,
+                    backgroundColor: active ? colors.primary : colors.card,
                     borderWidth: 1,
-                    borderColor: active ? colors.accent : colors.border,
+                    borderColor: active ? colors.primary : colors.border,
                   }}
                 >
-                  <AppText variant="caption" style={{ color: active ? colors.onAccent : colors.textMuted, fontWeight: '600' }}>
+                  <AppText variant="caption" style={{ color: active ? colors.onPrimary : colors.textMuted, fontWeight: '600' }}>
                     {f.label}
                   </AppText>
                 </Pressable>
@@ -153,7 +165,7 @@ export default function RequestsScreen() {
                           width: 4,
                           height: 44,
                           borderRadius: 2,
-                          backgroundColor: request.type?.color ?? colors.accent,
+                          backgroundColor: readable(request.type?.color ?? colors.accent, colors.card, 3),
                         }}
                       />
                       <View style={{ flex: 1 }}>

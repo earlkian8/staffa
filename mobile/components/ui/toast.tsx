@@ -5,7 +5,9 @@ import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppText } from '@/components/ui/text';
+import { composite } from '@/theme/color';
 import { useTheme } from '@/theme/theme';
+import { status as statusTones, palette } from '@/theme/tokens';
 
 type ToastType = 'success' | 'error' | 'info';
 type Toast = { id: number; type: ToastType; message: string };
@@ -20,14 +22,14 @@ const ICONS: Record<ToastType, keyof typeof Ionicons.glyphMap> = {
   info: 'information-circle',
 };
 
-const COLORS: Record<ToastType, string> = {
-  success: '#10B981',
-  error: '#F43F5E',
-  info: '#0ABFBF',
+const TONES: Record<ToastType, string> = {
+  success: statusTones.present,
+  error: statusTones.absent,
+  info: palette.teal,
 };
 
 export function ToastProvider({ children }: { children: ReactNode }) {
-  const { colors } = useTheme();
+  const { colors, readable } = useTheme();
   const insets = useSafeAreaInsets();
   const [toasts, setToasts] = useState<Toast[]>([]);
   const counter = useRef(0);
@@ -42,19 +44,36 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     <ToastContext.Provider value={{ show }}>
       {children}
       <View pointerEvents="none" style={[styles.host, { top: insets.top + 8 }]}>
-        {toasts.map((toast) => (
-          <Animated.View
-            key={toast.id}
-            entering={FadeIn.duration(200)}
-            exiting={FadeOut.duration(200)}
-            style={[styles.toast, { backgroundColor: colors.card, borderColor: colors.border }]}
-          >
-            <Ionicons name={ICONS[toast.type]} size={20} color={COLORS[toast.type]} />
-            <AppText variant="label" style={{ flex: 1 }}>
-              {toast.message}
-            </AppText>
-          </Animated.View>
-        ))}
+        {toasts.map((toast) => {
+          // The ERP's Sonner treatment: a card washed with 8% of the status colour and a
+          // solid bar down the leading edge, rather than a fully saturated banner.
+          const tone = TONES[toast.type];
+          const wash = composite(tone, 0.08, colors.card);
+
+          return (
+            <Animated.View
+              key={toast.id}
+              entering={FadeIn.duration(200)}
+              exiting={FadeOut.duration(200)}
+              accessibilityRole="alert"
+              style={[
+                styles.toast,
+                {
+                  backgroundColor: wash,
+                  borderColor: colors.border,
+                  borderLeftColor: readable(tone, wash),
+                  borderLeftWidth: 3,
+                  shadowColor: colors.shadow,
+                },
+              ]}
+            >
+              <Ionicons name={ICONS[toast.type]} size={20} color={readable(tone, wash)} />
+              <AppText variant="label" style={{ flex: 1 }}>
+                {toast.message}
+              </AppText>
+            </Animated.View>
+          );
+        })}
       </View>
     </ToastContext.Provider>
   );
@@ -88,7 +107,6 @@ const styles = StyleSheet.create({
     paddingVertical: 13,
     borderRadius: 14,
     borderWidth: 1,
-    shadowColor: '#0F2044',
     shadowOpacity: 0.12,
     shadowRadius: 16,
     shadowOffset: { width: 0, height: 8 },

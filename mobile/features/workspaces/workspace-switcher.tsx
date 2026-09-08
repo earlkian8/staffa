@@ -7,7 +7,7 @@
  *
  * Visual language: companies render as rounded *squares* to set them apart from
  * people, who are always *circles* (avatars) elsewhere. The active workspace is the
- * one ringed and tinted in teal.
+ * one ringed and tinted in teal — the same job teal does on the ERP's sidebar.
  */
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
@@ -52,7 +52,7 @@ export function CompanyLogo({
       {uri ? (
         <Image source={{ uri }} style={{ width: '100%', height: '100%' }} contentFit="cover" transition={200} />
       ) : (
-        <AppText variant="label" style={{ color: colors.accent, fontSize: size * 0.34 }}>
+        <AppText variant="label" style={{ color: colors.accentText, fontSize: size * 0.34 }}>
           {(initials ?? '??').toUpperCase()}
         </AppText>
       )}
@@ -71,6 +71,8 @@ export function WorkspaceChip({ onPress }: { onPress: () => void }) {
     <Pressable
       onPress={onPress}
       hitSlop={6}
+      accessibilityRole="button"
+      accessibilityLabel={`Workspace: ${organization.name}`}
       style={({ pressed }) => ({
         flexDirection: 'row',
         alignItems: 'center',
@@ -143,15 +145,17 @@ export function WorkspaceSwitcher({ visible, onClose }: { visible: boolean; onCl
                 borderColor: active ? colors.accent : colors.border,
                 backgroundColor: active ? colors.accentSoft : colors.card,
               }}
+              accessibilityRole="button"
+              accessibilityState={{ selected: active }}
             >
               <CompanyLogo uri={org.logo} initials={org.initials} active={active} />
               <AppText variant="label" style={{ flex: 1 }} numberOfLines={1}>
                 {org.name}
               </AppText>
               {busy ? (
-                <ActivityIndicator color={colors.accent} />
+                <ActivityIndicator color={colors.accentText} />
               ) : active ? (
-                <Ionicons name="checkmark-circle" size={22} color={colors.accent} />
+                <Ionicons name="checkmark-circle" size={22} color={colors.accentText} />
               ) : (
                 <Ionicons name="swap-horizontal" size={20} color={colors.textFaint} />
               )}

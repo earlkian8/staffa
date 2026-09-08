@@ -1,19 +1,61 @@
 /**
- * SYNAPSE design tokens — kept in lock-step with the web app's brand so the two
- * read as one product: deep navy + teal, soft rounded cards, and a shared set of
- * status colours used everywhere a state is shown (attendance, leave, awards).
+ * SYNAPSE design tokens, in lock-step with the web ERP's `resources/css/app.css`.
+ *
+ * The ERP is a white product. Its signed-in shell is `--background: oklch(1 0 0)` with
+ * a neutral (zero-chroma) grey ramp for ink and hairlines, a near-black `--primary` for
+ * anything you press, and the brand teal held back for one job: showing which thing is
+ * active. Navy is the *pre-app* field — the sign-in and workspace-picker backdrop — and
+ * appears nowhere behind the app itself.
+ *
+ * This app used to invert that: navy slabs on Home and Awards, teal as the fill for
+ * every primary control, and 500-level status colours set as text on white (~2.5:1).
+ * It now follows the ERP. White is the surface; ink is the type and the primary action;
+ * teal marks selection; colour appears only where it carries meaning.
+ *
+ * Every value below is checked against WCAG AA (4.5:1 for text, 3:1 for a shape that
+ * carries meaning on its own) on the surface it is used on. Colours that arrive from
+ * the server — leave types, award types — can't be checked ahead of time, so they go
+ * through `readable()` from {@link useTheme} instead. See ./color.ts.
  */
 
-export const palette = {
-  navy: '#0F2044',
-  navyDeep: '#0B1530',
-  teal: '#0ABFBF',
-  tealPressed: '#09AEAE',
-  tealSoft: 'rgba(10,191,191,0.12)',
-  white: '#FFFFFF',
+/**
+ * The ERP's neutral ramp, converted from the `oklch()` values in `app.css`. These are
+ * the same greys the web app paints with, to the byte.
+ */
+const neutral = {
+  0: '#FFFFFF', //   oklch(1     0 0)  page and card
+  50: '#FAFAFA', //  oklch(0.985 0 0)  inverted ink
+  100: '#F5F5F5', // oklch(0.97  0 0)  recessed surface
+  150: '#EEEEEE', // oklch(0.95  0 0)  hairline inside a card
+  200: '#E5E5E5', // oklch(0.922 0 0)  card edge
+  400: '#A1A1A1', // oklch(0.708 0 0)  muted ink, dark scheme
+  500: '#737373', // oklch(0.556 0 0)  faint ink, light scheme
+  600: '#525252', // oklch(0.439 0 0)  muted ink, light scheme
+  800: '#262626', // oklch(0.269 0 0)  card edge, dark scheme
+  900: '#171717', // oklch(0.205 0 0)  primary; card, dark scheme
+  950: '#0A0A0A', // oklch(0.145 0 0)  ink; page, dark scheme
 } as const;
 
-/** Status colours, shared with the web app. */
+export const palette = {
+  /** The pre-app field: sign-in, register, splash, workspace picker. Not used in-app. */
+  navy: '#0F2044',
+  navyDeep: '#0B1530',
+  /** Brand teal. A fill and a marker — it is too light to carry text on white. */
+  teal: '#0ABFBF',
+  /** Teal deepened until a shape filled with it is visible on white (3:1) — the light
+   *  scheme's fill, since the brand teal on white is a 2.3:1 edge nobody can find. */
+  tealDeep: '#00A5A6',
+  /** Teal darkened until it clears 4.5:1 on a white card *and* on its own 12% tint. */
+  tealInk: '#007C7D',
+  white: '#FFFFFF',
+  neutral,
+} as const;
+
+/**
+ * Status tones. These are fills and dots; nothing sets one as text directly — `Pill`
+ * and the screens run them through `readable()` so the label darkens (light scheme) or
+ * lifts (dark scheme) to stay legible on whatever it sits on.
+ */
 export const status = {
   present: '#10B981',
   late: '#F59E0B',
@@ -29,65 +71,90 @@ export const status = {
 export type StatusKey = keyof typeof status;
 
 export type ColorScheme = {
-  brand: string;
-  brandText: string;
-  accent: string;
-  accentPressed: string;
-  accentSoft: string;
+  /** Surfaces, lightest first. `background` and `card` match in the light scheme — the
+   *  ERP separates a card from the page with its edge, not with a shade. */
   background: string;
   card: string;
+  /** The recessed surface: segmented-control tracks, skeletons. Always *away* from `card`. */
   cardAlt: string;
   border: string;
   hairline: string;
+
   text: string;
   textMuted: string;
   textFaint: string;
-  onAccent: string;
+
+  /** The thing you press. Near-black on white, inverting in the dark scheme — `--primary`. */
+  primary: string;
+  onPrimary: string;
+
+  /** Teal, split by job. */
+  accent: string; //     fills, edges and rings — always visible on the surface (3:1)
+  accentSoft: string; // a tint to sit an icon or initials on
+  accentText: string; // teal as type (4.5:1)
+  onAccent: string; //   what goes on top of an `accent` fill
+
+  danger: string;
+  onDanger: string;
+
   overlay: string;
   shadow: string;
 };
 
 const light: ColorScheme = {
-  brand: palette.navy,
-  brandText: palette.white,
-  accent: palette.teal,
-  accentPressed: palette.tealPressed,
-  accentSoft: palette.tealSoft,
+  background: neutral[0],
+  card: neutral[0],
+  cardAlt: neutral[100],
+  border: neutral[200],
+  hairline: neutral[150],
 
-  background: '#F7F8FA',
-  card: '#FFFFFF',
-  cardAlt: '#F1F5F9',
-  border: '#E2E8F0',
-  hairline: '#EEF2F6',
+  text: neutral[950], //  19.8:1
+  textMuted: neutral[600], // 7.8:1
+  textFaint: neutral[500], //  4.7:1
 
-  text: '#0F172A',
-  textMuted: '#64748B',
-  textFaint: '#94A3B8',
-  onAccent: '#04363B',
+  primary: neutral[900], // 17.9:1 on white
+  onPrimary: neutral[50], // 17.2:1 on primary
 
-  overlay: 'rgba(15,32,68,0.45)',
-  shadow: '#0F2044',
+  accent: palette.tealDeep, // 3.0:1 on white
+  accentSoft: 'rgba(10, 191, 191, 0.12)',
+  accentText: palette.tealInk, // 4.5:1 on white and on the 12% tint
+  onAccent: palette.navy, // 5.3:1 on the fill — the ERP's own teal/navy pairing
+
+  danger: '#E12950', // 4.5:1 on white, and carries white type at 4.5:1
+  onDanger: neutral[0],
+
+  overlay: 'rgba(10, 10, 10, 0.45)',
+  shadow: neutral[950],
 };
 
+/**
+ * The dark scheme is neutral too — the ERP's `.dark` block has zero chroma, so this is
+ * not a navy app after dark either. `card` sits one rung above the page because a phone
+ * has no hover state and RN shadows don't read on black; the edge alone isn't enough.
+ */
 const dark: ColorScheme = {
-  brand: '#13284F',
-  brandText: '#F8FAFC',
-  accent: palette.teal,
-  accentPressed: palette.tealPressed,
-  accentSoft: 'rgba(10,191,191,0.16)',
+  background: neutral[950],
+  card: neutral[900],
+  cardAlt: neutral[950],
+  border: neutral[800],
+  hairline: '#212121',
 
-  background: '#0B1530',
-  card: '#13213F',
-  cardAlt: '#1B2C4F',
-  border: '#22345C',
-  hairline: '#1B2A4A',
+  text: neutral[50], //   17.2:1
+  textMuted: neutral[400], // 6.9:1
+  textFaint: '#8C8C8C', //  5.3:1
 
-  text: '#F1F5F9',
-  textMuted: '#94A3B8',
-  textFaint: '#64748B',
-  onAccent: '#04363B',
+  primary: neutral[50],
+  onPrimary: neutral[900],
 
-  overlay: 'rgba(2,8,20,0.6)',
+  accent: palette.teal, // 7.9:1 on the dark card — the brand teal needs no help here
+  accentSoft: 'rgba(10, 191, 191, 0.2)',
+  accentText: palette.teal, // 7.9:1
+  onAccent: palette.navy, // 7.0:1
+
+  danger: '#E12950',
+  onDanger: neutral[0],
+
+  overlay: 'rgba(0, 0, 0, 0.6)',
   shadow: '#000000',
 };
 

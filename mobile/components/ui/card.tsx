@@ -9,7 +9,11 @@ type CardProps = ViewProps & {
   style?: ViewStyle | ViewStyle[];
 };
 
-/** Rounded, hairline-bordered surface — the app's default container. */
+/**
+ * Rounded, hairline-bordered surface — the app's default container. Page and card are
+ * both white (as in the ERP), so the edge is what separates them; `elevated` adds a
+ * soft neutral shadow for the one card on a screen that should sit above the rest.
+ */
 export function Card({ padded = true, onPress, elevated, style, children, ...rest }: CardProps) {
   const { colors, radius, spacing } = useTheme();
 
@@ -22,9 +26,9 @@ export function Card({ padded = true, onPress, elevated, style, children, ...res
     ...(elevated
       ? {
           shadowColor: colors.shadow,
-          shadowOpacity: 0.08,
-          shadowRadius: 16,
-          shadowOffset: { width: 0, height: 8 },
+          shadowOpacity: 0.1,
+          shadowRadius: 20,
+          shadowOffset: { width: 0, height: 10 },
           elevation: 3,
         }
       : {}),

@@ -32,7 +32,7 @@ export function Avatar({ uri, initials, size = 44, ring }: AvatarProps) {
       {uri ? (
         <Image source={{ uri }} style={{ width: '100%', height: '100%' }} contentFit="cover" transition={200} />
       ) : (
-        <AppText variant="label" style={{ color: colors.accent, fontSize: size * 0.36 }}>
+        <AppText variant="label" style={{ color: colors.accentText, fontSize: size * 0.36 }}>
           {(initials ?? '?').toUpperCase()}
         </AppText>
       )}

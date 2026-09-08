@@ -1,17 +1,28 @@
 import { View, type ViewStyle } from 'react-native';
 
 import { AppText } from '@/components/ui/text';
+import { composite, withAlpha } from '@/theme/color';
+import { useTheme } from '@/theme/theme';
 
 type PillProps = {
   label: string;
-  /** Accent colour; background is rendered at ~14% of it. */
+  /** The state's tone. The fill is a tint of it; the label and dot are darkened (or
+   *  lifted, after dark) from it until they clear 4.5:1 against that tint. */
   color: string;
   dot?: boolean;
+  /** The surface the pill is sitting on, when it isn't a card. */
+  on?: string;
   style?: ViewStyle;
 };
 
-/** A coloured status pill — translucent fill + solid text, used app-wide. */
-export function Pill({ label, color, dot, style }: PillProps) {
+/** A status pill — a tint of the state's tone, with a label that stays legible on it. */
+export function Pill({ label, color, dot, on, style }: PillProps) {
+  const { colors, scheme, readable } = useTheme();
+
+  const surface = on ?? colors.card;
+  const alpha = scheme === 'dark' ? 0.2 : 0.12;
+  const ink = readable(color, composite(color, alpha, surface));
+
   return (
     <View
       style={[
@@ -20,7 +31,7 @@ export function Pill({ label, color, dot, style }: PillProps) {
           alignItems: 'center',
           gap: 6,
           alignSelf: 'flex-start',
-          backgroundColor: withAlpha(color, 0.14),
+          backgroundColor: withAlpha(color, alpha),
           paddingHorizontal: 10,
           paddingVertical: 4,
           borderRadius: 999,
@@ -28,21 +39,10 @@ export function Pill({ label, color, dot, style }: PillProps) {
         style,
       ]}
     >
-      {dot && <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: color }} />}
-      <AppText variant="caption" style={{ color, fontWeight: '700' }}>
+      {dot && <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: ink }} />}
+      <AppText variant="caption" style={{ color: ink, fontWeight: '700' }}>
         {label}
       </AppText>
     </View>
   );
-}
-
-/** Apply an alpha to a #RRGGBB (or rgb/rgba) colour string. */
-export function withAlpha(color: string, alpha: number): string {
-  if (color.startsWith('#') && color.length === 7) {
-    const r = parseInt(color.slice(1, 3), 16);
-    const g = parseInt(color.slice(3, 5), 16);
-    const b = parseInt(color.slice(5, 7), 16);
-    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-  }
-  return color;
 }

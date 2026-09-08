@@ -15,6 +15,7 @@ import {
 } from 'react';
 import { useColorScheme as useSystemScheme } from 'react-native';
 
+import { readableOn } from './color';
 import { radius, schemes, spacing, status, typography, type ColorScheme } from './tokens';
 
 export type ThemeMode = 'light' | 'dark' | 'system';
@@ -27,6 +28,13 @@ type ThemeValue = {
   radius: typeof radius;
   typography: typeof typography;
   status: typeof status;
+  /**
+   * The version of a colour that can legibly carry text — or be the only thing marking
+   * a state — on `surface` (the card, unless you say otherwise). Status tones and the
+   * colours HR picked for leave and award types all pass through here before they are
+   * painted, so nothing lands at 2.5:1 on white. See ./color.ts.
+   */
+  readable: (color: string, surface?: string, ratio?: number) => string;
   setMode: (mode: ThemeMode) => void;
 };
 
@@ -35,7 +43,8 @@ const STORAGE_KEY = 'synapse.theme-mode';
 const ThemeContext = createContext<ThemeValue | null>(null);
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const system = useSystemScheme() ?? 'light';
+  // RN reports 'unspecified' as well as null when the platform has no preference.
+  const system: 'light' | 'dark' = useSystemScheme() === 'dark' ? 'dark' : 'light';
   const [mode, setModeState] = useState<ThemeMode>('system');
 
   useEffect(() => {
@@ -53,19 +62,53 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   const scheme: 'light' | 'dark' = mode === 'system' ? system : mode;
 
-  const value = useMemo<ThemeValue>(
-    () => ({
+  const value = useMemo<ThemeValue>(() => {
+    const colors = schemes[scheme];
+
+    return {
       mode,
       scheme,
-      colors: schemes[scheme],
+      colors,
       spacing,
       radius,
       typography,
       status,
+      readable: (color, surface = colors.card, ratio = 4.5) => readableOn(color, surface, ratio),
       setMode,
-    }),
-    [mode, scheme, setMode],
-  );
+    };
+  }, [mode, scheme, setMode]);
+
+  return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
+}
+
+/**
+ * Re-provides the theme in a fixed scheme for one subtree.
+ *
+ * The sign-in, register and workspace-picker screens sit on the navy field and put a
+ * card on top of it that is white whatever the phone's appearance setting says. Without
+ * this, the fields and labels inside that card resolved against the *dark* scheme on a
+ * phone set to dark — pale grey type on white, around 2:1. The card declares the surface
+ * it actually is, and everything inside it resolves against that.
+ */
+export function FixedScheme({
+  scheme,
+  children,
+}: {
+  scheme: 'light' | 'dark';
+  children: ReactNode;
+}) {
+  const parent = useTheme();
+
+  const value = useMemo<ThemeValue>(() => {
+    const colors = schemes[scheme];
+
+    return {
+      ...parent,
+      scheme,
+      colors,
+      readable: (color, surface = colors.card, ratio = 4.5) => readableOn(color, surface, ratio),
+    };
+  }, [parent, scheme]);
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 }

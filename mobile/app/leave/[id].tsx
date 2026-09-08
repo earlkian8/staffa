@@ -21,7 +21,7 @@ import { useTheme } from '@/theme/theme';
 import type { LeaveRequest, Paginated } from '@/types/api';
 
 export default function LeaveDetailScreen() {
-  const { colors, spacing } = useTheme();
+  const { colors, spacing, readable } = useTheme();
   const { id } = useLocalSearchParams<{ id: string }>();
   const toast = useToast();
 
@@ -64,7 +64,14 @@ export default function LeaveDetailScreen() {
           <>
             <Card elevated style={{ gap: spacing.md }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
-                <View style={{ width: 6, height: 44, borderRadius: 3, backgroundColor: request.type?.color ?? colors.accent }} />
+                <View
+                  style={{
+                    width: 6,
+                    height: 44,
+                    borderRadius: 3,
+                    backgroundColor: readable(request.type?.color ?? colors.accent, colors.card, 3),
+                  }}
+                />
                 <View style={{ flex: 1 }}>
                   <AppText variant="heading">{request.type?.name ?? 'Leave'}</AppText>
                   <AppText variant="caption" muted>
@@ -114,7 +121,7 @@ export default function LeaveDetailScreen() {
                 label="Cancel request"
                 variant="danger"
                 onPress={() => setConfirmOpen(true)}
-                icon={<Ionicons name="close-circle-outline" size={20} color="#fff" />}
+                icon={<Ionicons name="close-circle-outline" size={20} color={colors.onDanger} />}
               />
             )}
           </>

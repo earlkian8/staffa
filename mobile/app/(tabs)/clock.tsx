@@ -7,7 +7,7 @@ import * as Haptics from 'expo-haptics';
 
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Pill, withAlpha } from '@/components/ui/pill';
+import { Pill } from '@/components/ui/pill';
 import { Screen, ScreenHeader } from '@/components/ui/screen';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Sheet } from '@/components/ui/sheet';
@@ -22,11 +22,12 @@ import { getCurrentCoords, type Coords } from '@/lib/location';
 import { captureSelfie } from '@/lib/selfie';
 import { attendanceMeta } from '@/lib/status';
 import { useQuery } from '@/lib/use-query';
+import { composite, onColor, withAlpha } from '@/theme/color';
 import { useTheme } from '@/theme/theme';
 import type { PunchType, TodayResponse } from '@/types/api';
 
 export default function ClockScreen() {
-  const { colors, spacing, status } = useTheme();
+  const { colors, spacing, status, readable } = useTheme();
   const { user } = useAuth();
   const toast = useToast();
 
@@ -103,6 +104,9 @@ export default function ClockScreen() {
   }, [pendingType, coords, photoUri]);
 
   const statusMeta = record ? attendanceMeta(record.status) : null;
+  // The confirmation flash keeps the punch type's colour, pulled to a shade the tick
+  // can sit on — a white tick on a raw 500-level green is 2.5:1.
+  const burst = justPunched ? readable(PUNCH_META[justPunched].color, colors.background, 5) : colors.accent;
 
   return (
     <Screen>
@@ -145,7 +149,7 @@ export default function ClockScreen() {
                     justifyContent: 'center',
                   }}
                 >
-                  <Ionicons name="time-outline" size={22} color={colors.accent} />
+                  <Ionicons name="time-outline" size={22} color={colors.accentText} />
                 </View>
                 <View style={{ flex: 1 }}>
                   <AppText variant="overline" muted>
@@ -169,7 +173,7 @@ export default function ClockScreen() {
                   <AppText variant="overline" muted>
                     On the clock
                   </AppText>
-                  <AppText style={{ fontSize: 30, fontWeight: '800', color: colors.accent, fontVariant: ['tabular-nums'] }}>
+                  <AppText style={{ fontSize: 30, fontWeight: '800', color: colors.text, fontVariant: ['tabular-nums'] }}>
                     {formatElapsed(now.getTime() - new Date(record.first_in_at).getTime())}
                   </AppText>
                   <AppText variant="caption" faint>
@@ -188,7 +192,7 @@ export default function ClockScreen() {
                   <SummaryStat label="Worked" value={formatMinutes(record.worked_minutes)} />
                 </View>
                 {record.late_minutes > 0 && (
-                  <AppText variant="caption" style={{ color: status.late, marginTop: spacing.md }}>
+                  <AppText variant="caption" style={{ color: readable(status.late), marginTop: spacing.md }}>
                     Flagged {record.late_minutes} min late
                   </AppText>
                 )}
@@ -203,12 +207,16 @@ export default function ClockScreen() {
                     width: 56,
                     height: 56,
                     borderRadius: 28,
-                    backgroundColor: withAlpha(colors.accent, 0.14),
+                    backgroundColor: withAlpha(status.present, 0.14),
                     alignItems: 'center',
                     justifyContent: 'center',
                   }}
                 >
-                  <Ionicons name="checkmark-done" size={30} color={colors.accent} />
+                  <Ionicons
+                    name="checkmark-done"
+                    size={30}
+                    color={readable(status.present, composite(status.present, 0.14, colors.card))}
+                  />
                 </View>
                 <AppText variant="heading">All done for today</AppText>
                 <AppText variant="caption" muted center>
@@ -221,6 +229,7 @@ export default function ClockScreen() {
                   <Button
                     label={PUNCH_META[primary].label}
                     onPress={() => beginPunch(primary)}
+                    variant="accent"
                     size="lg"
                     icon={<Ionicons name={PUNCH_META[primary].icon} size={22} color={colors.onAccent} />}
                   />
@@ -252,12 +261,12 @@ export default function ClockScreen() {
             width: 120,
             height: 120,
             borderRadius: 60,
-            backgroundColor: PUNCH_META[justPunched].color,
+            backgroundColor: burst,
             alignItems: 'center',
             justifyContent: 'center',
           }}
         >
-          <Ionicons name="checkmark" size={64} color="#fff" />
+          <Ionicons name="checkmark" size={64} color={onColor(burst)} />
         </Animated.View>
       )}
 
@@ -307,7 +316,7 @@ export default function ClockScreen() {
                     justifyContent: 'center',
                   }}
                 >
-                  <Ionicons name="camera-outline" size={22} color={colors.accent} />
+                  <Ionicons name="camera-outline" size={22} color={colors.accentText} />
                 </View>
               )}
               <AppText variant="label" style={{ flex: 1 }}>
@@ -316,7 +325,13 @@ export default function ClockScreen() {
               <Ionicons name="chevron-forward" size={18} color={colors.textFaint} />
             </Pressable>
 
-            <Button label={`Confirm ${PUNCH_META[pendingType].label}`} onPress={submitPunch} loading={submitting} size="lg" />
+            <Button
+              label={`Confirm ${PUNCH_META[pendingType].label}`}
+              onPress={submitPunch}
+              loading={submitting}
+              variant="accent"
+              size="lg"
+            />
           </Animated.View>
         )}
       </Sheet>

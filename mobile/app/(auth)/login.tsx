@@ -17,6 +17,7 @@ import { AppText } from '@/components/ui/text';
 import { useToast } from '@/components/ui/toast';
 import { ApiError } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
+import { FixedScheme } from '@/theme/theme';
 import { palette } from '@/theme/tokens';
 
 export default function LoginScreen() {
@@ -84,65 +85,67 @@ export default function LoginScreen() {
               </AppText>
             </Animated.View>
 
-            <Animated.View
-              entering={FadeIn.duration(500).delay(150)}
-              style={{
-                backgroundColor: palette.white,
-                borderRadius: 24,
-                padding: 22,
-                gap: 16,
-              }}
-            >
-              <View style={{ gap: 4 }}>
-                <AppText variant="heading" style={{ color: palette.navy }}>
-                  Welcome back
-                </AppText>
-                <AppText variant="caption" style={{ color: '#64748B' }}>
-                  Sign in to your SYNAPSE account.
-                </AppText>
-              </View>
+            <FixedScheme scheme="light">
+              <Animated.View
+                entering={FadeIn.duration(500).delay(150)}
+                style={{
+                  backgroundColor: palette.white,
+                  borderRadius: 24,
+                  padding: 22,
+                  gap: 16,
+                }}
+              >
+                <View style={{ gap: 4 }}>
+                  <AppText variant="heading" style={{ color: palette.navy }}>
+                    Welcome back
+                  </AppText>
+                  <AppText variant="caption" style={{ color: palette.neutral[500] }}>
+                    Sign in to your SYNAPSE account.
+                  </AppText>
+                </View>
 
-              <Input
-                label="Email"
-                placeholder="you@company.com"
-                autoCapitalize="none"
-                keyboardType="email-address"
-                autoComplete="email"
-                value={email}
-                onChangeText={setEmail}
-                error={errors.email}
-                editable={!submitting}
-              />
-
-              <View style={{ position: 'relative' }}>
                 <Input
-                  label="Password"
-                  placeholder="••••••••"
-                  secureTextEntry={!showPassword}
-                  value={password}
-                  onChangeText={setPassword}
-                  error={errors.password}
+                  label="Email"
+                  placeholder="you@company.com"
+                  autoCapitalize="none"
+                  keyboardType="email-address"
+                  autoComplete="email"
+                  value={email}
+                  onChangeText={setEmail}
+                  error={errors.email}
                   editable={!submitting}
-                  onSubmitEditing={onSubmit}
-                  returnKeyType="go"
                 />
-                <Pressable
-                  onPress={() => setShowPassword((v) => !v)}
-                  hitSlop={10}
-                  style={{ position: 'absolute', right: 14, top: 38 }}
-                >
-                  <Ionicons name={showPassword ? 'eye-off' : 'eye'} size={20} color="#94A3B8" />
-                </Pressable>
-              </View>
 
-              <Button
-                label="Sign in"
-                onPress={onSubmit}
-                loading={submitting}
-                disabled={!email || !password}
-                size="lg"
-              />
-            </Animated.View>
+                <View style={{ position: 'relative' }}>
+                  <Input
+                    label="Password"
+                    placeholder="••••••••"
+                    secureTextEntry={!showPassword}
+                    value={password}
+                    onChangeText={setPassword}
+                    error={errors.password}
+                    editable={!submitting}
+                    onSubmitEditing={onSubmit}
+                    returnKeyType="go"
+                  />
+                  <Pressable
+                    onPress={() => setShowPassword((v) => !v)}
+                    hitSlop={10}
+                    style={{ position: 'absolute', right: 14, top: 38 }}
+                  >
+                    <Ionicons name={showPassword ? 'eye-off' : 'eye'} size={20} color={palette.neutral[500]} />
+                  </Pressable>
+                </View>
+
+                <Button
+                  label="Sign in"
+                  onPress={onSubmit}
+                  loading={submitting}
+                  disabled={!email || !password}
+                  size="lg"
+                />
+              </Animated.View>
+            </FixedScheme>
 
             <View
               style={{

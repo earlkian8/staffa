@@ -6,7 +6,8 @@
  *
  * Companies render as rounded squares here, the system-wide mark for an
  * organisation (people are always circles). Visual language matches the sign-in
- * screen: SYNAPSE's deep-navy field with white cards.
+ * screen: SYNAPSE's deep-navy field with white cards. The field is the only place
+ * navy appears — past the sign-in gate the app is white, like the ERP's shell.
  */
 import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
@@ -18,6 +19,7 @@ import { useToast } from '@/components/ui/toast';
 import { AppText } from '@/components/ui/text';
 import { CompanyLogo } from '@/features/workspaces/workspace-switcher';
 import { useAuth } from '@/lib/auth';
+import { FixedScheme } from '@/theme/theme';
 import { palette } from '@/theme/tokens';
 import type { AuthOrganization } from '@/types/api';
 
@@ -72,49 +74,51 @@ export default function SelectWorkspaceScreen() {
             </AppText>
           </Animated.View>
 
-          <Animated.View
-            entering={FadeIn.duration(450).delay(120)}
-            style={{ gap: 10 }}
-          >
-            {organizations.map((org) => {
-              const active = org.id === organization?.id;
-              const busy = entering === org.id;
+          <FixedScheme scheme="light">
+            <Animated.View
+              entering={FadeIn.duration(450).delay(120)}
+              style={{ gap: 10 }}
+            >
+              {organizations.map((org) => {
+                const active = org.id === organization?.id;
+                const busy = entering === org.id;
 
-              return (
-                <Pressable
-                  key={org.id}
-                  onPress={() => onEnter(org)}
-                  disabled={entering !== null}
-                  style={({ pressed }) => ({
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    gap: 14,
-                    padding: 14,
-                    borderRadius: 18,
-                    backgroundColor: palette.white,
-                    opacity: pressed || (entering !== null && !busy) ? 0.85 : 1,
-                  })}
-                >
-                  <CompanyLogo uri={org.logo} initials={org.initials} active={active} />
-                  <View style={{ flex: 1 }}>
-                    <AppText variant="label" style={{ color: palette.navy }} numberOfLines={1}>
-                      {org.name}
-                    </AppText>
-                    {active && (
-                      <AppText variant="caption" style={{ color: palette.teal, marginTop: 2 }}>
-                        Current workspace
+                return (
+                  <Pressable
+                    key={org.id}
+                    onPress={() => onEnter(org)}
+                    disabled={entering !== null}
+                    style={({ pressed }) => ({
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 14,
+                      padding: 14,
+                      borderRadius: 18,
+                      backgroundColor: palette.white,
+                      opacity: pressed || (entering !== null && !busy) ? 0.85 : 1,
+                    })}
+                  >
+                    <CompanyLogo uri={org.logo} initials={org.initials} active={active} />
+                    <View style={{ flex: 1 }}>
+                      <AppText variant="label" style={{ color: palette.navy }} numberOfLines={1}>
+                        {org.name}
                       </AppText>
+                      {active && (
+                        <AppText variant="caption" style={{ color: palette.tealInk, marginTop: 2 }}>
+                          Current workspace
+                        </AppText>
+                      )}
+                    </View>
+                    {busy ? (
+                      <ActivityIndicator color={palette.tealInk} />
+                    ) : (
+                      <Ionicons name="chevron-forward" size={20} color={palette.neutral[500]} />
                     )}
-                  </View>
-                  {busy ? (
-                    <ActivityIndicator color={palette.teal} />
-                  ) : (
-                    <Ionicons name="chevron-forward" size={20} color="#94A3B8" />
-                  )}
-                </Pressable>
-              );
-            })}
-          </Animated.View>
+                  </Pressable>
+                );
+              })}
+            </Animated.View>
+          </FixedScheme>
 
           <Pressable
             onPress={logout}

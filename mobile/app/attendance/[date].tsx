@@ -93,7 +93,7 @@ export default function AttendanceDayScreen() {
                           justifyContent: 'center',
                         }}
                       >
-                        <Ionicons name={PUNCH_META[punch.type].icon} size={18} color={colors.accent} />
+                        <Ionicons name={PUNCH_META[punch.type].icon} size={18} color={colors.accentText} />
                       </View>
                       <View style={{ flex: 1 }}>
                         <AppText variant="label">{PUNCH_TIMELINE_LABEL[punch.type]}</AppText>

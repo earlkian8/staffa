@@ -16,12 +16,13 @@ import { CompanyLogo, WorkspaceSwitcher } from '@/features/workspaces/workspace-
 import { formatDate, humanize } from '@/lib/format';
 import { useAuth } from '@/lib/auth';
 import { useQuery } from '@/lib/use-query';
+import { withAlpha } from '@/theme/color';
 import { status as statusColors } from '@/theme/tokens';
 import { useTheme, type ThemeMode } from '@/theme/theme';
 import type { Profile } from '@/types/api';
 
 export default function ProfileScreen() {
-  const { colors, spacing, mode, setMode } = useTheme();
+  const { colors, spacing, mode, setMode, readable } = useTheme();
   const { logout, organization, organizations } = useAuth();
   const router = useRouter();
   const [switcherOpen, setSwitcherOpen] = useState(false);
@@ -39,6 +40,8 @@ export default function ProfileScreen() {
             size={24}
             color={colors.text}
             onPress={() => router.push('/awards')}
+            accessibilityRole="button"
+            accessibilityLabel="Awards"
           />
         }
       />
@@ -77,12 +80,12 @@ export default function ProfileScreen() {
                   width: 42,
                   height: 42,
                   borderRadius: 14,
-                  backgroundColor: 'rgba(245,158,11,0.16)',
+                  backgroundColor: withAlpha(statusColors.late, 0.14),
                   alignItems: 'center',
                   justifyContent: 'center',
                 }}
               >
-                <Ionicons name="trophy" size={20} color="#F59E0B" />
+                <Ionicons name="trophy" size={20} color={readable(statusColors.late)} />
               </View>
               <AppText variant="label" style={{ flex: 1 }}>
                 My Awards & Recognition
@@ -112,7 +115,7 @@ export default function ProfileScreen() {
                     </AppText>
                   </View>
                   {organizations.length > 1 && (
-                    <Ionicons name="swap-horizontal" size={20} color={colors.accent} />
+                    <Ionicons name="swap-horizontal" size={20} color={colors.accentText} />
                   )}
                 </Card>
               </View>

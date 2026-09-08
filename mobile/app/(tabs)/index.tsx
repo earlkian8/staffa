@@ -6,7 +6,7 @@ import Animated, { FadeIn } from 'react-native-reanimated';
 
 import { Avatar } from '@/components/ui/avatar';
 import { Card } from '@/components/ui/card';
-import { Pill, withAlpha } from '@/components/ui/pill';
+import { Pill } from '@/components/ui/pill';
 import { Screen } from '@/components/ui/screen';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AppText } from '@/components/ui/text';
@@ -18,7 +18,9 @@ import { useAuth } from '@/lib/auth';
 import { formatDate, formatLongDate, formatMinutes, formatTime } from '@/lib/format';
 import { attendanceMeta } from '@/lib/status';
 import { useQuery } from '@/lib/use-query';
+import { composite, withAlpha } from '@/theme/color';
 import { useTheme } from '@/theme/theme';
+import { status as statusTones } from '@/theme/tokens';
 import type { Award, LeaveBalance, LeaveRequest, TodayResponse } from '@/types/api';
 
 type HomeData = {
@@ -36,7 +38,7 @@ function greeting(): string {
 }
 
 export default function HomeScreen() {
-  const { colors, spacing } = useTheme();
+  const { colors, spacing, readable } = useTheme();
   const { user } = useAuth();
   const router = useRouter();
   const [switcherOpen, setSwitcherOpen] = useState(false);
@@ -55,12 +57,16 @@ export default function HomeScreen() {
   const statusMeta = record ? attendanceMeta(record.status) : null;
   const firstName = user?.employee?.full_name?.split(' ')[0] ?? user?.name?.split(' ')[0] ?? 'there';
 
+  // Only the Clock tile is tinted. Four differently-coloured tiles would be decoration;
+  // one says which of these you are most likely to have come here to press.
   const actions = [
-    { icon: 'finger-print', label: 'Clock', tint: colors.accent, onPress: () => router.push('/(tabs)/clock') },
-    { icon: 'add-circle', label: 'File Leave', tint: '#6366F1', onPress: () => router.push('/leave/new') },
-    { icon: 'calendar', label: 'Attendance', tint: '#10B981', onPress: () => router.push('/(tabs)/attendance') },
-    { icon: 'trophy', label: 'Awards', tint: '#F59E0B', onPress: () => router.push('/awards') },
+    { icon: 'finger-print', label: 'Clock', accent: true, onPress: () => router.push('/(tabs)/clock') },
+    { icon: 'add-circle', label: 'File Leave', accent: false, onPress: () => router.push('/leave/new') },
+    { icon: 'calendar', label: 'Attendance', accent: false, onPress: () => router.push('/(tabs)/attendance') },
+    { icon: 'trophy', label: 'Awards', accent: false, onPress: () => router.push('/awards') },
   ] as const;
+
+  const pendingWash = composite(statusTones.late, 0.12, colors.card);
 
   return (
     <Screen>
@@ -84,20 +90,27 @@ export default function HomeScreen() {
             <AppText variant="title">{firstName}</AppText>
           </View>
           {data && data.pending.length > 0 && (
-            <Pressable onPress={() => router.push('/(tabs)/requests')}>
+            <Pressable
+              onPress={() => router.push('/(tabs)/requests')}
+              accessibilityRole="button"
+              accessibilityLabel={`${data.pending.length} pending leave requests`}
+            >
               <View
                 style={{
                   flexDirection: 'row',
                   alignItems: 'center',
                   gap: 6,
-                  backgroundColor: withAlpha('#F59E0B', 0.14),
+                  backgroundColor: withAlpha(statusTones.late, 0.12),
                   paddingHorizontal: 10,
                   paddingVertical: 7,
                   borderRadius: 999,
                 }}
               >
-                <Ionicons name="hourglass-outline" size={15} color="#F59E0B" />
-                <AppText variant="caption" style={{ color: '#F59E0B', fontWeight: '700' }}>
+                <Ionicons name="hourglass-outline" size={15} color={readable(statusTones.late, pendingWash)} />
+                <AppText
+                  variant="caption"
+                  style={{ color: readable(statusTones.late, pendingWash), fontWeight: '700' }}
+                >
                   {data.pending.length} pending
                 </AppText>
               </View>
@@ -105,19 +118,15 @@ export default function HomeScreen() {
           )}
         </View>
 
-        {/* Today hero */}
+        {/* Today */}
         <Animated.View entering={FadeIn.duration(400)}>
-          <Card
-            elevated
-            onPress={() => router.push('/(tabs)/clock')}
-            style={{ backgroundColor: colors.brand, borderColor: colors.brand }}
-          >
+          <Card elevated onPress={() => router.push('/(tabs)/clock')}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-              <View style={{ gap: 2 }}>
-                <AppText variant="overline" style={{ color: 'rgba(255,255,255,0.6)' }}>
+              <View style={{ flex: 1, gap: 2 }}>
+                <AppText variant="overline" faint>
                   {formatLongDate(new Date())}
                 </AppText>
-                <AppText variant="title" style={{ color: '#fff' }}>
+                <AppText variant="title">
                   {record?.first_in_at ? (record.last_out_at ? 'Day complete' : 'You’re clocked in') : 'Not clocked in'}
                 </AppText>
               </View>
@@ -138,20 +147,20 @@ export default function HomeScreen() {
             {loading ? (
               <Skeleton height={20} width="60%" style={{ marginTop: 16 }} />
             ) : (
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.lg, marginTop: spacing.lg }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xl, marginTop: spacing.lg }}>
                 <View>
-                  <AppText variant="caption" style={{ color: 'rgba(255,255,255,0.6)' }}>
+                  <AppText variant="caption" muted>
                     Time In
                   </AppText>
-                  <AppText variant="heading" style={{ color: '#fff' }}>
+                  <AppText variant="heading" style={{ fontVariant: ['tabular-nums'] }}>
                     {formatTime(record?.first_in_at)}
                   </AppText>
                 </View>
                 <View>
-                  <AppText variant="caption" style={{ color: 'rgba(255,255,255,0.6)' }}>
+                  <AppText variant="caption" muted>
                     Worked
                   </AppText>
-                  <AppText variant="heading" style={{ color: '#fff' }}>
+                  <AppText variant="heading" style={{ fontVariant: ['tabular-nums'] }}>
                     {formatMinutes(record?.worked_minutes ?? 0)}
                   </AppText>
                 </View>
@@ -164,19 +173,23 @@ export default function HomeScreen() {
         {/* Quick actions */}
         <View style={{ flexDirection: 'row', gap: spacing.md }}>
           {actions.map((action) => (
-            <Pressable key={action.label} onPress={action.onPress} style={{ flex: 1 }}>
+            <Pressable key={action.label} onPress={action.onPress} style={{ flex: 1 }} accessibilityRole="button">
               <Card padded={false} style={{ alignItems: 'center', paddingVertical: spacing.lg, gap: 8 }}>
                 <View
                   style={{
                     width: 42,
                     height: 42,
                     borderRadius: 14,
-                    backgroundColor: withAlpha(action.tint, 0.14),
+                    backgroundColor: action.accent ? colors.accentSoft : colors.cardAlt,
                     alignItems: 'center',
                     justifyContent: 'center',
                   }}
                 >
-                  <Ionicons name={action.icon} size={21} color={action.tint} />
+                  <Ionicons
+                    name={action.icon}
+                    size={21}
+                    color={action.accent ? colors.accentText : colors.text}
+                  />
                 </View>
                 <AppText variant="caption" style={{ fontWeight: '600', fontSize: 11 }}>
                   {action.label}
@@ -192,8 +205,8 @@ export default function HomeScreen() {
             <AppText variant="overline" muted>
               Leave Balances
             </AppText>
-            <Pressable onPress={() => router.push('/(tabs)/requests')}>
-              <AppText variant="caption" style={{ color: colors.accent, fontWeight: '700' }}>
+            <Pressable onPress={() => router.push('/(tabs)/requests')} accessibilityRole="button">
+              <AppText variant="caption" style={{ color: colors.accentText, fontWeight: '700' }}>
                 See all
               </AppText>
             </Pressable>
@@ -204,7 +217,14 @@ export default function HomeScreen() {
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: spacing.md }}>
               {(data?.balances ?? []).slice(0, 5).map((balance) => (
                 <Card key={balance.leave_type_id} style={{ width: 130, gap: 4 }}>
-                  <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: balance.color ?? colors.accent }} />
+                  <View
+                    style={{
+                      width: 8,
+                      height: 8,
+                      borderRadius: 4,
+                      backgroundColor: readable(balance.color ?? colors.accent, colors.card, 3),
+                    }}
+                  />
                   <AppText variant="caption" muted numberOfLines={1}>
                     {balance.name}
                   </AppText>
@@ -228,18 +248,7 @@ export default function HomeScreen() {
               onPress={() => router.push('/awards')}
               style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}
             >
-              <View
-                style={{
-                  width: 46,
-                  height: 46,
-                  borderRadius: 14,
-                  backgroundColor: withAlpha(data.awards[0].award_type?.color ?? '#F59E0B', 0.16),
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <Ionicons name="trophy" size={22} color={data.awards[0].award_type?.color ?? '#F59E0B'} />
-              </View>
+              <AwardMark color={data.awards[0].award_type?.color ?? statusTones.late} />
               <View style={{ flex: 1 }}>
                 <AppText variant="label">{data.awards[0].award_type?.name ?? 'Award'}</AppText>
                 <AppText variant="caption" muted numberOfLines={1}>
@@ -254,5 +263,25 @@ export default function HomeScreen() {
 
       <WorkspaceSwitcher visible={switcherOpen} onClose={() => setSwitcherOpen(false)} />
     </Screen>
+  );
+}
+
+/** A trophy on a tint of the award type's own colour, whatever HR chose for it. */
+function AwardMark({ color }: { color: string }) {
+  const { colors, readable } = useTheme();
+
+  return (
+    <View
+      style={{
+        width: 46,
+        height: 46,
+        borderRadius: 14,
+        backgroundColor: withAlpha(color, 0.14),
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+    >
+      <Ionicons name="trophy" size={22} color={readable(color, composite(color, 0.14, colors.card))} />
+    </View>
   );
 }

@@ -26,7 +26,7 @@ export function EmptyState({ icon = 'sparkles-outline', title, message }: EmptyS
           justifyContent: 'center',
         }}
       >
-        <Ionicons name={icon} size={28} color={colors.accent} />
+        <Ionicons name={icon} size={28} color={colors.accentText} />
       </View>
       <AppText variant="heading" center>
         {title}

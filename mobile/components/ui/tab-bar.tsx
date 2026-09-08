@@ -15,7 +15,11 @@ const ICONS: Record<string, { active: keyof typeof Ionicons.glyphMap; inactive: 
   profile: { active: 'person', inactive: 'person-outline', label: 'Profile' },
 };
 
-/** A custom bottom tab bar with a prominent, elevated centre Clock action. */
+/**
+ * The bottom tab bar. Teal marks the selected tab — the same job it does on the ERP's
+ * sidebar — and fills the raised Clock button, which is the one place in the app where
+ * the brand colour is the whole shape rather than a marker.
+ */
 export function TabBar({ state, navigation }: BottomTabBarProps) {
   const { colors, spacing } = useTheme();
   const insets = useSafeAreaInsets();
@@ -41,6 +45,7 @@ export function TabBar({ state, navigation }: BottomTabBarProps) {
 
         const focused = state.index === index;
         const isClock = route.name === 'clock';
+        const tint = focused ? colors.accentText : colors.textFaint;
 
         const onPress = () => {
           void Haptics.selectionAsync();
@@ -53,7 +58,14 @@ export function TabBar({ state, navigation }: BottomTabBarProps) {
 
         if (isClock) {
           return (
-            <Pressable key={route.key} onPress={onPress} style={{ flex: 1, alignItems: 'center' }}>
+            <Pressable
+              key={route.key}
+              onPress={onPress}
+              accessibilityRole="tab"
+              accessibilityLabel={meta.label}
+              accessibilityState={{ selected: focused }}
+              style={{ flex: 1, alignItems: 'center' }}
+            >
               <View
                 style={{
                   width: 60,
@@ -65,16 +77,16 @@ export function TabBar({ state, navigation }: BottomTabBarProps) {
                   justifyContent: 'center',
                   borderWidth: 4,
                   borderColor: colors.card,
-                  shadowColor: colors.accent,
-                  shadowOpacity: 0.45,
-                  shadowRadius: 12,
-                  shadowOffset: { width: 0, height: 6 },
+                  shadowColor: colors.shadow,
+                  shadowOpacity: 0.18,
+                  shadowRadius: 10,
+                  shadowOffset: { width: 0, height: 5 },
                   elevation: 6,
                 }}
               >
                 <Ionicons name={meta.active} size={28} color={colors.onAccent} />
               </View>
-              <AppText variant="caption" style={{ color: colors.textMuted, marginTop: 2, fontSize: 11 }}>
+              <AppText variant="caption" style={{ color: tint, marginTop: 2, fontSize: 11, fontWeight: focused ? '700' : '500' }}>
                 {meta.label}
               </AppText>
             </Pressable>
@@ -82,15 +94,18 @@ export function TabBar({ state, navigation }: BottomTabBarProps) {
         }
 
         return (
-          <Pressable key={route.key} onPress={onPress} style={{ flex: 1, alignItems: 'center', gap: 3, paddingVertical: 4 }}>
-            <Ionicons
-              name={focused ? meta.active : meta.inactive}
-              size={23}
-              color={focused ? colors.accent : colors.textFaint}
-            />
+          <Pressable
+            key={route.key}
+            onPress={onPress}
+            accessibilityRole="tab"
+            accessibilityLabel={meta.label}
+            accessibilityState={{ selected: focused }}
+            style={{ flex: 1, alignItems: 'center', gap: 3, paddingVertical: 4 }}
+          >
+            <Ionicons name={focused ? meta.active : meta.inactive} size={23} color={tint} />
             <AppText
               variant="caption"
-              style={{ color: focused ? colors.accent : colors.textFaint, fontSize: 11, fontWeight: focused ? '700' : '500' }}
+              style={{ color: tint, fontSize: 11, fontWeight: focused ? '700' : '500' }}
             >
               {meta.label}
             </AppText>

@@ -5,7 +5,12 @@ import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-na
 import { AppText } from '@/components/ui/text';
 import { useTheme } from '@/theme/theme';
 
-type Variant = 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger';
+/**
+ * `primary` is the ERP's near-black button — the default for anything you press.
+ * `accent` is the brand teal, held for the one action this app exists for: punching in
+ * and out. Spending it anywhere else is what made every screen read as teal.
+ */
+type Variant = 'primary' | 'accent' | 'outline' | 'ghost' | 'danger';
 type Size = 'sm' | 'md' | 'lg';
 
 type ButtonProps = {
@@ -43,25 +48,33 @@ export function Button({
   const heights: Record<Size, number> = { sm: 40, md: 50, lg: 58 };
 
   const bg: Record<Variant, string> = {
-    primary: colors.accent,
-    secondary: colors.brand,
+    primary: colors.primary,
+    accent: colors.accent,
     outline: 'transparent',
     ghost: 'transparent',
-    danger: '#F43F5E',
+    danger: colors.danger,
   };
 
   const fg: Record<Variant, string> = {
-    primary: colors.onAccent,
-    secondary: colors.brandText,
+    primary: colors.onPrimary,
+    accent: colors.onAccent,
     outline: colors.text,
-    ghost: colors.accent,
-    danger: '#FFFFFF',
+    ghost: colors.accentText,
+    danger: colors.onDanger,
   };
 
+  const bordered = variant === 'outline';
   const isDisabled = disabled || loading;
+
+  // A disabled control goes quiet rather than translucent: dropping the whole button to
+  // half opacity takes its label down with it, and a label you can't read isn't a label.
+  const background = isDisabled && !bordered ? colors.cardAlt : bg[variant];
+  const foreground = isDisabled ? colors.textMuted : fg[variant];
 
   return (
     <AnimatedPressable
+      accessibilityRole="button"
+      accessibilityState={{ disabled: !!isDisabled, busy: !!loading }}
       onPress={() => {
         if (isDisabled) return;
         if (haptic) void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -79,10 +92,9 @@ export function Button({
         {
           height: heights[size],
           borderRadius: radius.md,
-          backgroundColor: bg[variant],
-          opacity: isDisabled ? 0.55 : 1,
+          backgroundColor: background,
           width: fullWidth ? '100%' : undefined,
-          borderWidth: variant === 'outline' ? 1.5 : 0,
+          borderWidth: bordered || (isDisabled && variant !== 'ghost') ? 1.5 : 0,
           borderColor: colors.border,
         },
         animatedStyle,
@@ -90,11 +102,11 @@ export function Button({
       ]}
     >
       {loading ? (
-        <ActivityIndicator color={fg[variant]} />
+        <ActivityIndicator color={foreground} />
       ) : (
         <View style={styles.content}>
           {icon}
-          <AppText variant={size === 'lg' ? 'heading' : 'label'} style={{ color: fg[variant] }}>
+          <AppText variant={size === 'lg' ? 'heading' : 'label'} style={{ color: foreground }}>
             {label}
           </AppText>
         </View>

@@ -146,7 +146,7 @@ export default function JoinScreen() {
               }}
             >
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <Ionicons name="time-outline" size={18} color={colors.accent} />
+                <Ionicons name="time-outline" size={18} color={colors.accentText} />
                 <AppText variant="label">Waiting for approval</AppText>
               </View>
               {pendingRequests.map((request) => (
@@ -159,7 +159,7 @@ export default function JoinScreen() {
 
           {/* ── Invitations addressed to them ───────────────────── */}
           {invitations.loading ? (
-            <ActivityIndicator color={colors.accent} />
+            <ActivityIndicator color={colors.accentText} />
           ) : (
             (invitations.data?.data ?? []).map((invitation) => (
               <View
@@ -185,12 +185,12 @@ export default function JoinScreen() {
                       width: 44,
                       height: 44,
                       borderRadius: 14,
-                      backgroundColor: colors.brand,
+                      backgroundColor: colors.accentSoft,
                       alignItems: 'center',
                       justifyContent: 'center',
                     }}
                   >
-                    <AppText variant="label" style={{ color: colors.brandText }}>
+                    <AppText variant="label" style={{ color: colors.accentText }}>
                       {invitation.organization.initials}
                     </AppText>
                   </View>

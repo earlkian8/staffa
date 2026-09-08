@@ -19,7 +19,7 @@ function toKey(year: number, month: number, day: number): string {
 
 /** A month grid with a status dot under each recorded day. */
 export function MonthCalendar({ month, byDate, onSelectDay }: MonthCalendarProps) {
-  const { colors } = useTheme();
+  const { colors, readable } = useTheme();
 
   const year = month.getFullYear();
   const m = month.getMonth();
@@ -40,7 +40,7 @@ export function MonthCalendar({ month, byDate, onSelectDay }: MonthCalendarProps
       <View style={{ flexDirection: 'row' }}>
         {WEEKDAYS.map((d, i) => (
           <View key={i} style={{ flex: 1, alignItems: 'center', paddingVertical: 6 }}>
-            <AppText variant="caption" faint style={{ fontWeight: '700' }}>
+            <AppText variant="caption" muted style={{ fontWeight: '700' }}>
               {d}
             </AppText>
           </View>
@@ -72,12 +72,12 @@ export function MonthCalendar({ month, byDate, onSelectDay }: MonthCalendarProps
                   borderRadius: 16,
                   alignItems: 'center',
                   justifyContent: 'center',
-                  backgroundColor: isToday ? colors.accent : 'transparent',
+                  backgroundColor: isToday ? colors.primary : 'transparent',
                 }}
               >
                 <AppText
                   variant="label"
-                  style={{ color: isToday ? colors.onAccent : status ? colors.text : colors.textFaint }}
+                  style={{ color: isToday ? colors.onPrimary : status ? colors.text : colors.textFaint }}
                 >
                   {day}
                 </AppText>
@@ -88,7 +88,7 @@ export function MonthCalendar({ month, byDate, onSelectDay }: MonthCalendarProps
                   height: 6,
                   borderRadius: 3,
                   marginTop: 2,
-                  backgroundColor: meta ? meta.color : 'transparent',
+                  backgroundColor: meta ? readable(meta.color, colors.card, 3) : 'transparent',
                 }}
               />
             </Pressable>

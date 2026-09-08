@@ -43,7 +43,7 @@ function workingDays(start: string, end: string): number {
 }
 
 export default function NewLeaveScreen() {
-  const { colors, spacing } = useTheme();
+  const { colors, spacing, readable } = useTheme();
   const router = useRouter();
   const toast = useToast();
 
@@ -132,6 +132,8 @@ export default function NewLeaveScreen() {
                   return (
                     <Pressable
                       key={type.id}
+                      accessibilityRole="radio"
+                      accessibilityState={{ selected: active }}
                       onPress={() => {
                         setTypeId(type.id);
                         if (!type.allow_half_day) setIsHalfDay(false);
@@ -146,7 +148,14 @@ export default function NewLeaveScreen() {
                           borderWidth: active ? 2 : 1,
                         }}
                       >
-                        <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: type.color ?? colors.accent }} />
+                        <View
+                          style={{
+                            width: 10,
+                            height: 10,
+                            borderRadius: 5,
+                            backgroundColor: readable(type.color ?? colors.accent, colors.card, 3),
+                          }}
+                        />
                         <View style={{ flex: 1 }}>
                           <AppText variant="label">{type.name}</AppText>
                           {balance && (
@@ -155,14 +164,14 @@ export default function NewLeaveScreen() {
                             </AppText>
                           )}
                         </View>
-                        {active && <Ionicons name="checkmark-circle" size={22} color={colors.accent} />}
+                        {active && <Ionicons name="checkmark-circle" size={22} color={colors.accentText} />}
                       </Card>
                     </Pressable>
                   );
                 })}
               </View>
               {errors.leave_type_id && (
-                <AppText variant="caption" style={{ color: '#F43F5E' }}>
+                <AppText variant="caption" style={{ color: colors.danger }}>
                   {errors.leave_type_id}
                 </AppText>
               )}
@@ -178,7 +187,7 @@ export default function NewLeaveScreen() {
                 <DateField label="To" value={end} onPress={() => setShowPicker('end')} />
               </View>
               {(errors.start_date || errors.end_date) && (
-                <AppText variant="caption" style={{ color: '#F43F5E' }}>
+                <AppText variant="caption" style={{ color: colors.danger }}>
                   {errors.start_date ?? errors.end_date}
                 </AppText>
               )}
@@ -233,7 +242,7 @@ export default function NewLeaveScreen() {
                 <AppText variant="label" muted>
                   Working days
                 </AppText>
-                <AppText variant="label" style={{ color: colors.accent }}>
+                <AppText variant="label" style={{ color: colors.accentText }}>
                   {days} {days === 1 ? 'day' : 'days'}
                 </AppText>
               </View>
@@ -296,7 +305,7 @@ function DateField({ label, value, onPress }: { label: string; value: string; on
           paddingVertical: 13,
         }}
       >
-        <Ionicons name="calendar-outline" size={18} color={colors.accent} />
+        <Ionicons name="calendar-outline" size={18} color={colors.accentText} />
         <AppText variant="label">{formatDate(value)}</AppText>
       </View>
     </Pressable>

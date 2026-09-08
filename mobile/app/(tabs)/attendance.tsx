@@ -31,7 +31,7 @@ function monthRange(month: Date) {
 type AttData = { records: AttendanceRecord[]; summary: AttendanceSummary };
 
 export default function AttendanceScreen() {
-  const { colors, spacing, status } = useTheme();
+  const { colors, spacing, status, readable } = useTheme();
   const router = useRouter();
 
   const [month, setMonth] = useState(() => {
@@ -96,7 +96,7 @@ export default function AttendanceScreen() {
             <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
               {metrics.map((metric) => (
                 <View key={metric.label} style={{ alignItems: 'center', flex: 1 }}>
-                  <AppText variant="title" style={{ color: metric.color }}>
+                  <AppText variant="title" style={{ color: readable(metric.color), fontVariant: ['tabular-nums'] }}>
                     {metric.value}
                   </AppText>
                   <AppText variant="caption" muted>
@@ -138,8 +138,10 @@ export default function AttendanceScreen() {
                 const meta = attendanceMeta(s);
                 return (
                   <View key={s} style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-                    <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: meta.color }} />
-                    <AppText variant="caption" faint>
+                    <View
+                      style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: readable(meta.color, colors.card, 3) }}
+                    />
+                    <AppText variant="caption" muted>
                       {meta.label}
                     </AppText>
                   </View>

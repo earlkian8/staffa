@@ -31,7 +31,9 @@ export function Input({ label, error, hint, style, ...rest }: InputProps) {
             backgroundColor: colors.card,
             borderRadius: radius.md,
             borderWidth: 1.5,
-            borderColor: error ? '#F43F5E' : focused ? colors.accent : colors.border,
+            // The focus edge is teal darkened to 3:1 — the ERP's focus tint, at a
+            // strength you can actually see against a white field.
+            borderColor: error ? colors.danger : focused ? colors.accent : colors.border,
             paddingHorizontal: spacing.lg,
             paddingVertical: 14,
             fontSize: 15,
@@ -42,7 +44,7 @@ export function Input({ label, error, hint, style, ...rest }: InputProps) {
         {...rest}
       />
       {error ? (
-        <AppText variant="caption" style={{ color: '#F43F5E' }}>
+        <AppText variant="caption" style={{ color: colors.danger }}>
           {error}
         </AppText>
       ) : hint ? (

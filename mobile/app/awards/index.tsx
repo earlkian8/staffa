@@ -4,18 +4,19 @@ import Animated, { FadeIn } from 'react-native-reanimated';
 
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
-import { withAlpha } from '@/components/ui/pill';
 import { Screen, ScreenHeader } from '@/components/ui/screen';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AppText } from '@/components/ui/text';
 import { awardsApi } from '@/features/awards/api';
 import { formatDate } from '@/lib/format';
 import { useQuery } from '@/lib/use-query';
+import { composite, withAlpha } from '@/theme/color';
 import { useTheme } from '@/theme/theme';
+import { status as statusTones } from '@/theme/tokens';
 import type { Award } from '@/types/api';
 
 export default function AwardsScreen() {
-  const { colors, spacing } = useTheme();
+  const { colors, spacing, readable } = useTheme();
 
   const { data, loading, refreshing, refresh } = useQuery<{ data: Award[] }>(() => awardsApi.list(), []);
   const awards = data?.data ?? [];
@@ -43,31 +44,35 @@ export default function AwardsScreen() {
         ) : (
           <>
             {/* Count banner */}
-            <Card elevated style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, backgroundColor: colors.brand, borderColor: colors.brand }}>
+            <Card elevated style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
               <View
                 style={{
                   width: 52,
                   height: 52,
                   borderRadius: 16,
-                  backgroundColor: 'rgba(245,158,11,0.2)',
+                  backgroundColor: withAlpha(statusTones.late, 0.14),
                   alignItems: 'center',
                   justifyContent: 'center',
                 }}
               >
-                <Ionicons name="trophy" size={26} color="#F59E0B" />
+                <Ionicons
+                  name="trophy"
+                  size={26}
+                  color={readable(statusTones.late, composite(statusTones.late, 0.14, colors.card))}
+                />
               </View>
               <View>
-                <AppText variant="title" style={{ color: '#fff' }}>
+                <AppText variant="title" style={{ fontVariant: ['tabular-nums'] }}>
                   {awards.length}
                 </AppText>
-                <AppText variant="caption" style={{ color: 'rgba(255,255,255,0.7)' }}>
+                <AppText variant="caption" muted>
                   {awards.length === 1 ? 'recognition' : 'recognitions'} received
                 </AppText>
               </View>
             </Card>
 
             {awards.map((award, index) => {
-              const tint = award.award_type?.color ?? '#F59E0B';
+              const tint = award.award_type?.color ?? statusTones.late;
               return (
                 <Animated.View key={award.id} entering={FadeIn.duration(320).delay(index * 50)}>
                   <Card style={{ gap: spacing.md }}>
@@ -82,7 +87,7 @@ export default function AwardsScreen() {
                           justifyContent: 'center',
                         }}
                       >
-                        <Ionicons name="ribbon" size={22} color={tint} />
+                        <Ionicons name="ribbon" size={22} color={readable(tint, composite(tint, 0.16, colors.card))} />
                       </View>
                       <View style={{ flex: 1 }}>
                         <AppText variant="heading">{award.award_type?.name ?? 'Award'}</AppText>

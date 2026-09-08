@@ -11,6 +11,7 @@ import { AppText } from '@/components/ui/text';
 import { useToast } from '@/components/ui/toast';
 import { ApiError } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
+import { FixedScheme } from '@/theme/theme';
 import { palette } from '@/theme/tokens';
 
 type Errors = Partial<Record<'first_name' | 'last_name' | 'email' | 'password', string>>;
@@ -108,103 +109,105 @@ export default function RegisterScreen() {
               </AppText>
             </Animated.View>
 
-            <Animated.View
-              entering={FadeIn.duration(500).delay(150)}
-              style={{
-                backgroundColor: palette.white,
-                borderRadius: 24,
-                padding: 22,
-                gap: 16,
-              }}
-            >
-              <View style={{ gap: 4 }}>
-                <AppText variant="heading" style={{ color: palette.navy }}>
-                  Create your account
-                </AppText>
-                <AppText variant="caption" style={{ color: '#64748B' }}>
-                  This account is yours. You&apos;ll connect it to your company next.
-                </AppText>
-              </View>
-
-              <View style={{ flexDirection: 'row', gap: 12 }}>
-                <View style={{ flex: 1 }}>
-                  <Input
-                    label="First name"
-                    placeholder="Juan"
-                    autoCapitalize="words"
-                    autoComplete="given-name"
-                    value={firstName}
-                    onChangeText={setFirstName}
-                    error={errors.first_name}
-                    editable={!submitting}
-                  />
+            <FixedScheme scheme="light">
+              <Animated.View
+                entering={FadeIn.duration(500).delay(150)}
+                style={{
+                  backgroundColor: palette.white,
+                  borderRadius: 24,
+                  padding: 22,
+                  gap: 16,
+                }}
+              >
+                <View style={{ gap: 4 }}>
+                  <AppText variant="heading" style={{ color: palette.navy }}>
+                    Create your account
+                  </AppText>
+                  <AppText variant="caption" style={{ color: palette.neutral[500] }}>
+                    This account is yours. You&apos;ll connect it to your company next.
+                  </AppText>
                 </View>
-                <View style={{ flex: 1 }}>
-                  <Input
-                    label="Last name"
-                    placeholder="dela Cruz"
-                    autoCapitalize="words"
-                    autoComplete="family-name"
-                    value={lastName}
-                    onChangeText={setLastName}
-                    error={errors.last_name}
-                    editable={!submitting}
-                  />
+
+                <View style={{ flexDirection: 'row', gap: 12 }}>
+                  <View style={{ flex: 1 }}>
+                    <Input
+                      label="First name"
+                      placeholder="Juan"
+                      autoCapitalize="words"
+                      autoComplete="given-name"
+                      value={firstName}
+                      onChangeText={setFirstName}
+                      error={errors.first_name}
+                      editable={!submitting}
+                    />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Input
+                      label="Last name"
+                      placeholder="dela Cruz"
+                      autoCapitalize="words"
+                      autoComplete="family-name"
+                      value={lastName}
+                      onChangeText={setLastName}
+                      error={errors.last_name}
+                      editable={!submitting}
+                    />
+                  </View>
                 </View>
-              </View>
 
-              <Input
-                label="Email"
-                placeholder="you@example.com"
-                hint="Use any address you check — it doesn't have to be a work one."
-                autoCapitalize="none"
-                keyboardType="email-address"
-                autoComplete="email"
-                value={email}
-                onChangeText={setEmail}
-                error={errors.email}
-                editable={!submitting}
-              />
-
-              <View style={{ position: 'relative' }}>
                 <Input
-                  label="Password"
-                  placeholder="At least 8 characters"
-                  secureTextEntry={!showPassword}
-                  autoComplete="new-password"
-                  value={password}
-                  onChangeText={setPassword}
-                  error={errors.password}
+                  label="Email"
+                  placeholder="you@example.com"
+                  hint="Use any address you check — it doesn't have to be a work one."
+                  autoCapitalize="none"
+                  keyboardType="email-address"
+                  autoComplete="email"
+                  value={email}
+                  onChangeText={setEmail}
+                  error={errors.email}
                   editable={!submitting}
                 />
-                <Pressable
-                  onPress={() => setShowPassword((v) => !v)}
-                  hitSlop={10}
-                  style={{ position: 'absolute', right: 14, top: 38 }}
-                >
-                  <Ionicons name={showPassword ? 'eye-off' : 'eye'} size={20} color="#94A3B8" />
-                </Pressable>
-              </View>
 
-              <Input
-                label="Confirm password"
-                placeholder="Type it again"
-                secureTextEntry={!showPassword}
-                value={confirmation}
-                onChangeText={setConfirmation}
-                editable={!submitting}
-                onSubmitEditing={onSubmit}
-                returnKeyType="go"
-              />
+                <View style={{ position: 'relative' }}>
+                  <Input
+                    label="Password"
+                    placeholder="At least 8 characters"
+                    secureTextEntry={!showPassword}
+                    autoComplete="new-password"
+                    value={password}
+                    onChangeText={setPassword}
+                    error={errors.password}
+                    editable={!submitting}
+                  />
+                  <Pressable
+                    onPress={() => setShowPassword((v) => !v)}
+                    hitSlop={10}
+                    style={{ position: 'absolute', right: 14, top: 38 }}
+                  >
+                    <Ionicons name={showPassword ? 'eye-off' : 'eye'} size={20} color={palette.neutral[500]} />
+                  </Pressable>
+                </View>
 
-              <Button
-                label="Create account"
-                onPress={onSubmit}
-                loading={submitting}
-                disabled={!complete}
-                size="lg"
-              />
-            </Animated.View>
+                <Input
+                  label="Confirm password"
+                  placeholder="Type it again"
+                  secureTextEntry={!showPassword}
+                  value={confirmation}
+                  onChangeText={setConfirmation}
+                  editable={!submitting}
+                  onSubmitEditing={onSubmit}
+                  returnKeyType="go"
+                />
+
+                <Button
+                  label="Create account"
+                  onPress={onSubmit}
+                  loading={submitting}
+                  disabled={!complete}
+                  size="lg"
+                />
+              </Animated.View>
+            </FixedScheme>
 
             <View
               style={{
