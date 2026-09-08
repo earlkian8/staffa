@@ -78,7 +78,7 @@ export default function Workspaces({
                 {/* Top brand bar */}
                 <header className="relative z-10 flex items-center justify-between px-6 py-5 sm:px-10">
                     <div className="flex items-center gap-2">
-                        <AppLogoIcon className="size-7 object-contain" />
+                        <AppLogoIcon surface="dark" className="h-6 w-auto" />
                         <span className="text-sm font-bold tracking-[0.2em] text-white/90">
                             SYNAPSE
                         </span>

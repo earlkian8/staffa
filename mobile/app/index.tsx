@@ -1,7 +1,7 @@
-import { Ionicons } from '@expo/vector-icons';
 import { View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 
+import { Logo } from '@/components/ui/logo';
 import { AppText } from '@/components/ui/text';
 import { palette } from '@/theme/tokens';
 
@@ -12,18 +12,7 @@ export default function Index() {
   return (
     <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.navy }}>
       <Animated.View entering={FadeIn.duration(400)} style={{ alignItems: 'center', gap: 16 }}>
-        <View
-          style={{
-            width: 72,
-            height: 72,
-            borderRadius: 22,
-            backgroundColor: palette.teal,
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <Ionicons name="finger-print" size={38} color={palette.navyDeep} />
-        </View>
+        <Logo width={168} surface="dark" />
         <AppText variant="display" style={{ color: palette.white, letterSpacing: 2 }}>
           SYNAPSE
         </AppText>

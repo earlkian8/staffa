@@ -57,7 +57,7 @@ export default function Invite() {
                     href="/"
                     className="mb-10 flex items-center gap-2 text-sm font-bold tracking-widest text-white/70 transition-colors hover:text-white"
                 >
-                    <AppLogoIcon className="size-7 object-contain" />
+                    <AppLogoIcon surface="dark" className="h-6 w-auto" />
                     SYNAPSE
                 </Link>
 

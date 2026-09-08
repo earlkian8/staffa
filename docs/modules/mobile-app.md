@@ -124,5 +124,12 @@ require approval — identical to the web `LeaveRequestController`.
   tenant-chosen colour can never land as 2.5:1 text on a white card. `FixedScheme` pins
   one subtree to a scheme, for the sign-in card that stays white whatever the phone's
   appearance setting says.
-- `components/ui/` — the shared kit (Button, Card, Pill, Input, Sheet, Toast, …).
+- `components/ui/` — the shared kit (Button, Card, Pill, Input, Sheet, Toast, …), plus
+  `logo.tsx`: the SYNAPSE mark in two colourways. About 60% of the artwork is deep navy
+  and vanishes on a dark ground, so `Logo` takes the original on light surfaces and a
+  reversed one (white figure, teal network) on dark; `surface="dark"` forces the reversed
+  mark on the splash and sign-in screens, which are navy whatever the phone is set to.
+  The mark is landscape (about 4:3), so it is sized by width and never squeezed into a
+  square. The app, splash and adaptive icons in `assets/images/` are generated from the
+  same artwork, each at the padding its slot wants.
 - `features/<module>/` — `api.ts` + components, mirroring the web feature folders.

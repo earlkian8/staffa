@@ -53,9 +53,10 @@ export default function AuthSimpleLayout({
                             href={home()}
                             className="flex w-fit items-center gap-3"
                         >
-                            <div className="h-8 w-8 flex-shrink-0 overflow-hidden rounded-lg ring-1 ring-white/10">
-                                <AppLogoIcon className="h-full w-full object-contain" />
-                            </div>
+                            <AppLogoIcon
+                                surface="dark"
+                                className="h-7 w-auto flex-shrink-0"
+                            />
                             <span className="text-xs font-bold tracking-[0.22em] text-white uppercase opacity-90">
                                 SYNAPSE
                             </span>
@@ -133,9 +134,7 @@ export default function AuthSimpleLayout({
                             href={home()}
                             className="flex items-center gap-2.5 lg:invisible"
                         >
-                            <div className="h-7 w-7 overflow-hidden rounded-md ring-1 ring-black/10">
-                                <AppLogoIcon className="h-full w-full object-contain" />
-                            </div>
+                            <AppLogoIcon className="h-6 w-auto flex-shrink-0" />
                             <span className="text-[11px] font-bold tracking-[0.18em] text-[#0F2044] uppercase dark:text-white">
                                 SYNAPSE
                             </span>
@@ -154,9 +153,7 @@ export default function AuthSimpleLayout({
                                 {/* Page header */}
                                 <div className="flex flex-col items-center gap-3 text-center">
                                     {/* Show logo on mobile only */}
-                                    <div className="mb-1 h-12 w-12 overflow-hidden rounded-xl shadow-md ring-1 ring-black/10 lg:hidden">
-                                        <AppLogoIcon className="h-full w-full object-contain" />
-                                    </div>
+                                    <AppLogoIcon className="mb-1 h-10 w-auto lg:hidden" />
                                     <div className="space-y-1.5">
                                         <h1
                                             className="text-[1.2rem] font-semibold text-[#0F2044] dark:text-white"

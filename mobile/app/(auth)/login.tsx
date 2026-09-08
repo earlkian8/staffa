@@ -13,6 +13,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Logo } from '@/components/ui/logo';
 import { AppText } from '@/components/ui/text';
 import { useToast } from '@/components/ui/toast';
 import { ApiError } from '@/lib/api';
@@ -64,20 +65,11 @@ export default function LoginScreen() {
             keyboardShouldPersistTaps="handled"
           >
             <Animated.View entering={FadeIn.duration(500)} style={{ alignItems: 'center', marginBottom: 36 }}>
-              <View
-                style={{
-                  width: 72,
-                  height: 72,
-                  borderRadius: 22,
-                  backgroundColor: palette.teal,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  marginBottom: 18,
-                }}
+              <Logo width={176} surface="dark" />
+              <AppText
+                variant="display"
+                style={{ color: palette.white, letterSpacing: 2, marginTop: 14 }}
               >
-                <Ionicons name="finger-print" size={38} color={palette.navyDeep} />
-              </View>
-              <AppText variant="display" style={{ color: palette.white, letterSpacing: 2 }}>
                 SYNAPSE
               </AppText>
               <AppText variant="body" style={{ color: 'rgba(255,255,255,0.7)', marginTop: 4 }}>

@@ -7,6 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Logo } from '@/components/ui/logo';
 import { AppText } from '@/components/ui/text';
 import { useToast } from '@/components/ui/toast';
 import { ApiError } from '@/lib/api';
@@ -91,20 +92,11 @@ export default function RegisterScreen() {
               entering={FadeIn.duration(500)}
               style={{ alignItems: 'center', marginBottom: 28 }}
             >
-              <View
-                style={{
-                  width: 64,
-                  height: 64,
-                  borderRadius: 20,
-                  backgroundColor: palette.teal,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  marginBottom: 16,
-                }}
+              <Logo width={152} surface="dark" />
+              <AppText
+                variant="display"
+                style={{ color: palette.white, letterSpacing: 2, marginTop: 12 }}
               >
-                <Ionicons name="person-add" size={32} color={palette.navyDeep} />
-              </View>
-              <AppText variant="display" style={{ color: palette.white, letterSpacing: 2 }}>
                 SYNAPSE
               </AppText>
             </Animated.View>

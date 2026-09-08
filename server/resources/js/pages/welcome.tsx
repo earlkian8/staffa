@@ -13,9 +13,10 @@ export default function Welcome() {
                 <header className="mb-6 w-full max-w-[335px] text-sm not-has-[nav]:hidden lg:max-w-4xl">
                     <nav className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                            <div className="flex h-8 w-8 items-center justify-center">
-                                <AppLogoIcon className="size-8 object-contain" />
-                            </div>
+                            <AppLogoIcon
+                                surface="dark"
+                                className="h-7 w-auto"
+                            />
                             <span className="text-sm font-bold tracking-widest text-white">
                                 SYNAPSE
                             </span>
