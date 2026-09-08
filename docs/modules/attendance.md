@@ -26,9 +26,18 @@ Everything is tenant-scoped (ADR 0005).
   - **Monthly Report** — one summary row per employee (present days, late count, absences,
     overtime, attendance-rate %) with an inline worked-hours **sparkline**.
 
-  Opening any record reveals the **day-detail drawer** — the full punch timeline (each
-  punch's time, source, GPS pin and selfie), the computed totals, and HR actions (correct,
-  approve, delete).
+  Opening any record reveals the **day-detail modal** — centred, like every other detail
+  surface in the app. It is laid out in three fixed regions rather than one long column:
+  the header states who and when (person, status, date, the shift that applied), a
+  **totals band** under it (worked / break / late / overtime) stays put while the body
+  scrolls, and the body splits the **audit trail** (the punch timeline — time, source,
+  GPS pin) from the **evidence**: a verification rail holding the selfie captured at each
+  punch, the remarks, and the sign-off. The selfies are what make a mobile punch
+  checkable, so the rail shows them large enough to recognise a face rather than as the
+  40px thumbnails they used to be; a photo that no longer resolves says so instead of
+  rendering broken. HR actions (correct, approve, delete) sit in a pinned footer.
+  **Recording or correcting a day** opens its own centred modal, with the four punches on
+  one row in the order they happen.
 - **`/attendance/me`** — employee **self-service**: a live **clock card** whose primary
   button flips with the day's state (Clock in → Start break → End break → Clock out),
   capturing geolocation (and an optional selfie) on each punch; plus today's punch

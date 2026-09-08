@@ -1,5 +1,14 @@
 import { router } from '@inertiajs/react';
+import { Clock3 } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import {
+    Modal,
+    ModalBody,
+    ModalContent,
+    ModalFooter,
+    ModalHeader,
+    ModalIcon,
+} from '@/components/modal';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -10,12 +19,6 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import {
-    Sheet,
-    SheetContent,
-    SheetHeader,
-    SheetTitle,
-} from '@/components/ui/sheet';
 import { Spinner } from '@/components/ui/spinner';
 import { attendanceRoutes } from '../routes';
 import type {
@@ -63,18 +66,22 @@ function localTime(iso: string | null): string {
     return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
-export function ManualEntrySheet({
+/**
+ * Recording a day by hand, or correcting one the clock got wrong.
+ *
+ * The four punches are the form's substance, so they sit on one row from `sm`
+ * up — the order they happen in, readable in a glance — rather than stacked two
+ * by two down a narrow strip.
+ */
+export function ManualEntryDialog({
     record,
     employees,
     open,
     onOpenChange,
 }: Props) {
     return (
-        <Sheet open={open} onOpenChange={onOpenChange}>
-            <SheetContent
-                side="right"
-                className="w-full gap-0 overflow-y-auto p-0 sm:max-w-md"
-            >
+        <Modal open={open} onOpenChange={onOpenChange}>
+            <ModalContent size="lg">
                 {open && (
                     <Body
                         key={record?.hashid ?? record?.employee?.id ?? 'new'}
@@ -83,8 +90,8 @@ export function ManualEntrySheet({
                         onDone={() => onOpenChange(false)}
                     />
                 )}
-            </SheetContent>
-        </Sheet>
+            </ModalContent>
+        </Modal>
     );
 }
 
@@ -179,88 +186,102 @@ function Body({
     };
 
     const canSubmit = isEdit || (employeeId !== '' && date !== '');
+    const needsSubject = !lockedEmployee;
 
     return (
-        <div className="flex h-full flex-col">
-            <SheetHeader className="border-b border-border px-6 py-4">
-                <SheetTitle className="text-base">
-                    {isEdit ? 'Correct attendance' : 'Record attendance'}
-                </SheetTitle>
-                {lockedEmployee && (
-                    <p className="text-xs text-muted-foreground">
-                        {lockedEmployee.full_name}
-                        {record?.work_date ? ` · ${record.work_date}` : ''}
-                    </p>
-                )}
-            </SheetHeader>
+        <>
+            <ModalHeader
+                icon={
+                    <ModalIcon>
+                        <Clock3 />
+                    </ModalIcon>
+                }
+                title={isEdit ? 'Correct attendance' : 'Record attendance'}
+                description={
+                    lockedEmployee
+                        ? `${lockedEmployee.full_name}${record?.work_date ? ` · ${record.work_date}` : ''}`
+                        : 'Enter a day the clock missed. Blank times mark the day absent.'
+                }
+            />
 
-            <div className="flex-1 space-y-5 px-6 py-6">
-                {!lockedEmployee && (
-                    <div className="space-y-1.5">
-                        <Label>Employee</Label>
-                        <Select
-                            value={employeeId}
-                            onValueChange={setEmployeeId}
-                        >
-                            <SelectTrigger aria-label="Select employee">
-                                <SelectValue placeholder="Select an employee" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {employees.map((employee) => (
-                                    <SelectItem
-                                        key={employee.id}
-                                        value={String(employee.id)}
-                                    >
-                                        {employee.full_name} ·{' '}
-                                        {employee.employee_no}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
+            <ModalBody className="space-y-5">
+                {needsSubject && (
+                    <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_11rem]">
+                        <div className="space-y-1.5">
+                            <Label htmlFor="manual-employee">Employee</Label>
+                            <Select
+                                value={employeeId}
+                                onValueChange={setEmployeeId}
+                            >
+                                <SelectTrigger
+                                    id="manual-employee"
+                                    className="w-full"
+                                >
+                                    <SelectValue placeholder="Select an employee" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {employees.map((employee) => (
+                                        <SelectItem
+                                            key={employee.id}
+                                            value={String(employee.id)}
+                                        >
+                                            {employee.full_name} ·{' '}
+                                            {employee.employee_no}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+
+                        {!isEdit && (
+                            <div className="space-y-1.5">
+                                <Label htmlFor="manual-date">Date</Label>
+                                <Input
+                                    id="manual-date"
+                                    type="date"
+                                    value={date}
+                                    max={today}
+                                    onChange={(event) =>
+                                        setDate(event.target.value)
+                                    }
+                                />
+                            </div>
+                        )}
                     </div>
                 )}
 
-                {!isEdit && !lockedEmployee && (
-                    <div className="space-y-1.5">
-                        <Label htmlFor="manual-date">Date</Label>
-                        <Input
-                            id="manual-date"
-                            type="date"
-                            value={date}
-                            max={today}
-                            onChange={(event) => setDate(event.target.value)}
+                <div className="space-y-2">
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                        <TimeField
+                            id="manual-time-in"
+                            label="Time in"
+                            value={times.time_in}
+                            onChange={(v) => setField('time_in', v)}
+                        />
+                        <TimeField
+                            id="manual-break-start"
+                            label="Break start"
+                            value={times.break_start}
+                            onChange={(v) => setField('break_start', v)}
+                        />
+                        <TimeField
+                            id="manual-break-end"
+                            label="Break end"
+                            value={times.break_end}
+                            onChange={(v) => setField('break_end', v)}
+                        />
+                        <TimeField
+                            id="manual-time-out"
+                            label="Time out"
+                            value={times.time_out}
+                            onChange={(v) => setField('time_out', v)}
                         />
                     </div>
-                )}
-
-                <div className="grid grid-cols-2 gap-3">
-                    <TimeField
-                        label="Time in"
-                        value={times.time_in}
-                        onChange={(v) => setField('time_in', v)}
-                    />
-                    <TimeField
-                        label="Time out"
-                        value={times.time_out}
-                        onChange={(v) => setField('time_out', v)}
-                    />
-                    <TimeField
-                        label="Break start"
-                        value={times.break_start}
-                        onChange={(v) => setField('break_start', v)}
-                    />
-                    <TimeField
-                        label="Break end"
-                        value={times.break_end}
-                        onChange={(v) => setField('break_end', v)}
-                    />
+                    <p className="text-xs text-muted-foreground">
+                        Worked hours, lateness and overtime are computed against
+                        the employee&apos;s schedule.
+                    </p>
                 </div>
-
-                <p className="text-xs text-muted-foreground">
-                    Leave times blank to mark the day absent. Worked hours,
-                    lateness and overtime are computed automatically against the
-                    employee's schedule.
-                </p>
 
                 <div className="space-y-1.5">
                     <Label htmlFor="manual-remarks">
@@ -278,9 +299,9 @@ function Body({
                         className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30"
                     />
                 </div>
-            </div>
+            </ModalBody>
 
-            <div className="flex items-center justify-end gap-2 border-t border-border px-6 py-4">
+            <ModalFooter>
                 <Button variant="ghost" onClick={onDone} disabled={processing}>
                     Cancel
                 </Button>
@@ -288,24 +309,27 @@ function Body({
                     {processing && <Spinner />}
                     {isEdit ? 'Save correction' : 'Save record'}
                 </Button>
-            </div>
-        </div>
+            </ModalFooter>
+        </>
     );
 }
 
 function TimeField({
+    id,
     label,
     value,
     onChange,
 }: {
+    id: string;
     label: string;
     value: string;
     onChange: (value: string) => void;
 }) {
     return (
         <div className="space-y-1.5">
-            <Label>{label}</Label>
+            <Label htmlFor={id}>{label}</Label>
             <Input
+                id={id}
                 type="time"
                 value={value}
                 onChange={(event) => onChange(event.target.value)}

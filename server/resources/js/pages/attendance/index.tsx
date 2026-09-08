@@ -1,15 +1,15 @@
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { CalendarCheck, CheckCheck, UserRound } from 'lucide-react';
 import { useMemo, useState } from 'react';
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import { Button } from '@/components/ui/button';
 import { AttendanceStatsCards } from '@/features/attendance/components/attendance-stats';
 import { AttendanceToolbar } from '@/features/attendance/components/attendance-toolbar';
 import { AttendanceViewTabs } from '@/features/attendance/components/attendance-view-tabs';
-import { ConfirmDialog } from '@/features/attendance/components/confirm-dialog';
 import { ExceptionsPanel } from '@/features/attendance/components/exceptions-panel';
-import { ManualEntrySheet } from '@/features/attendance/components/manual-entry-sheet';
+import { ManualEntryDialog } from '@/features/attendance/components/manual-entry-dialog';
 import { MonthlyReportTable } from '@/features/attendance/components/monthly-report-table';
-import { RecordDetailSheet } from '@/features/attendance/components/record-detail-sheet';
+import { RecordDetailDialog } from '@/features/attendance/components/record-detail-dialog';
 import { TodayLogTable } from '@/features/attendance/components/today-log-table';
 import { WeeklyGrid } from '@/features/attendance/components/weekly-grid';
 import { useAttendanceFilters } from '@/features/attendance/hooks/use-attendance-filters';
@@ -198,7 +198,7 @@ export default function AttendanceIndex() {
                 </div>
             </div>
 
-            <RecordDetailSheet
+            <RecordDetailDialog
                 record={detail}
                 canManage={can.manage}
                 open={detailOpen}
@@ -208,7 +208,7 @@ export default function AttendanceIndex() {
                 onDelete={askDelete}
             />
 
-            <ManualEntrySheet
+            <ManualEntryDialog
                 record={manual}
                 employees={options.employees}
                 open={manualOpen}

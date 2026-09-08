@@ -6,8 +6,18 @@ import type { Punch } from '../types';
 /**
  * A vertical timeline of the day's punches — the audit trail. Each punch shows
  * its time, source, optional GPS coordinates and selfie thumbnail.
+ *
+ * `withPhotos` is turned off where the selfies are shown somewhere better: the
+ * record modal collects them into a verification rail at a size a face can be
+ * recognised in, rather than repeating them here at 40px.
  */
-export function PunchTimeline({ punches }: { punches: Punch[] }) {
+export function PunchTimeline({
+    punches,
+    withPhotos = true,
+}: {
+    punches: Punch[];
+    withPhotos?: boolean;
+}) {
     if (punches.length === 0) {
         return (
             <p className="rounded-lg bg-muted/50 px-3 py-6 text-center text-sm text-muted-foreground">
@@ -17,7 +27,7 @@ export function PunchTimeline({ punches }: { punches: Punch[] }) {
     }
 
     return (
-        <ol className="relative space-y-4 pl-6">
+        <ol className="relative space-y-4 pl-8">
             {/* The connecting rail. */}
             <span className="absolute top-1 bottom-1 left-[11px] w-px bg-border" />
 
@@ -31,7 +41,7 @@ export function PunchTimeline({ punches }: { punches: Punch[] }) {
                     <li key={punch.id} className="relative">
                         <span
                             className={cn(
-                                'absolute top-0.5 -left-6 flex size-6 items-center justify-center rounded-full ring-4 ring-card',
+                                'absolute top-0.5 -left-8 flex size-6 items-center justify-center rounded-full ring-4 ring-card',
                                 meta.accent,
                             )}
                         >
@@ -76,7 +86,7 @@ export function PunchTimeline({ punches }: { punches: Punch[] }) {
                                 )}
                             </div>
 
-                            {punch.photo && (
+                            {withPhotos && punch.photo && (
                                 <a
                                     href={punch.photo}
                                     target="_blank"
