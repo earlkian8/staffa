@@ -1,6 +1,5 @@
 import { useForm } from '@inertiajs/react';
-import { GripVertical, Layers, Plus, X } from 'lucide-react';
-import { useMemo } from 'react';
+import { Layers, Plus, X } from 'lucide-react';
 import { FormField } from '@/components/form-field';
 import { FormSelect } from '@/components/form-select';
 import {
@@ -32,6 +31,8 @@ import type {
     KpiCriterion,
     RatingScaleOption,
 } from '../types';
+import type { ItemDraft, SectionDraft } from './measurement-editor';
+import { MeasurementEditor } from './measurement-editor';
 
 const RESULT_DISPLAYS: { value: ResultDisplay; label: string; hint: string }[] =
     [
@@ -61,22 +62,6 @@ const AUDIENCES: {
     { value: 'position', label: 'Positions' },
     { value: 'employment_type', label: 'Employment types' },
 ];
-
-type SectionDraft = {
-    key: string;
-    name: string;
-    description: string;
-    weight: number;
-};
-
-type ItemDraft = {
-    kpi_criterion_id: number | null;
-    rating_scale_id: number | null;
-    section_key: string;
-    name: string;
-    description: string;
-    weight: number;
-};
 
 type Props = {
     template: ReviewTemplateOption | null;
@@ -172,60 +157,24 @@ function FormBody({
                     weight: 100,
                 },
             ]
-        ).map(
-            (section): SectionDraft => ({
-                key: section.key,
-                name: section.name,
-                description: section.description ?? '',
-                weight: section.weight,
-            }),
-        ),
-        bands: (template?.bands ?? defaultBands).map(
-            (band): RatingBand => ({ ...band }),
-        ),
-        items: (template?.items ?? []).map(
-            (item): ItemDraft => ({
-                kpi_criterion_id: item.kpi_criterion_id,
-                rating_scale_id: item.rating_scale_id,
-                section_key: item.section_key,
-                name: item.name,
-                description: item.description ?? '',
-                weight: item.weight,
-            }),
-        ),
+        ).map((section): SectionDraft => ({
+            key: section.key,
+            name: section.name,
+            description: section.description ?? '',
+            weight: section.weight,
+        })),
+        bands: (template?.bands ?? defaultBands).map((band): RatingBand => ({
+            ...band,
+        })),
+        items: (template?.items ?? []).map((item): ItemDraft => ({
+            kpi_criterion_id: item.kpi_criterion_id,
+            rating_scale_id: item.rating_scale_id,
+            section_key: item.section_key,
+            name: item.name,
+            description: item.description ?? '',
+            weight: item.weight,
+        })),
     });
-
-    const scaleOptions = useMemo(
-        () => [
-            { value: 'inherit', label: 'Framework default' },
-            ...scales.map((scale) => ({
-                value: String(scale.id),
-                label: `${scale.name} · ${scale.descriptor}`,
-            })),
-        ],
-        [scales],
-    );
-
-    const sectionTotal = data.sections.reduce(
-        (sum, section) => sum + (section.weight || 0),
-        0,
-    );
-
-    const patchSection = (index: number, patch: Partial<SectionDraft>) =>
-        setData(
-            'sections',
-            data.sections.map((section, i) =>
-                i === index ? { ...section, ...patch } : section,
-            ),
-        );
-
-    const patchItem = (index: number, patch: Partial<ItemDraft>) =>
-        setData(
-            'items',
-            data.items.map((item, i) =>
-                i === index ? { ...item, ...patch } : item,
-            ),
-        );
 
     const patchBand = (index: number, patch: Partial<RatingBand>) =>
         setData(
@@ -234,46 +183,6 @@ function FormBody({
                 i === index ? { ...band, ...patch } : band,
             ),
         );
-
-    const addSection = () => {
-        const key = `section_${Date.now()}`;
-
-        setData('sections', [
-            ...data.sections,
-            { key, name: '', description: '', weight: 0 },
-        ]);
-    };
-
-    const removeSection = (index: number) => {
-        const removed = data.sections[index];
-
-        setData((current) => ({
-            ...current,
-            sections: current.sections.filter((_, i) => i !== index),
-            // Items would otherwise point at a section that no longer exists.
-            items: current.items.filter(
-                (item) => item.section_key !== removed.key,
-            ),
-        }));
-    };
-
-    const addItem = (sectionKey: string, criterionId: string) => {
-        const criterion = criteria.find(
-            (candidate) => String(candidate.id) === criterionId,
-        );
-
-        setData('items', [
-            ...data.items,
-            {
-                kpi_criterion_id: criterion?.id ?? null,
-                rating_scale_id: criterion?.rating_scale_id ?? null,
-                section_key: sectionKey,
-                name: criterion?.name ?? '',
-                description: criterion?.description ?? '',
-                weight: criterion?.weight ?? 0,
-            },
-        ]);
-    };
 
     const submit = (event: React.FormEvent) => {
         event.preventDefault();
@@ -411,235 +320,17 @@ function FormBody({
                 </ModalSection>
 
                 {/* ── What it measures ───────────────────────────────────── */}
-                <ModalSection
-                    title="What it measures"
-                    hint="Sections are weighted against each other; the criteria inside one are weighted against each other."
-                    action={
-                        <div className="flex items-center gap-2">
-                            <span
-                                className={cn(
-                                    'text-xs font-medium tabular-nums',
-                                    Math.round(sectionTotal) === 100
-                                        ? 'text-emerald-600 dark:text-emerald-400'
-                                        : 'text-amber-600 dark:text-amber-400',
-                                )}
-                            >
-                                {sectionTotal}%
-                            </span>
-                            <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                onClick={addSection}
-                                disabled={data.sections.length >= 10}
-                            >
-                                <Plus className="size-4" />
-                                Section
-                            </Button>
-                        </div>
+                <MeasurementEditor
+                    sections={data.sections}
+                    items={data.items}
+                    criteria={criteria}
+                    scales={scales}
+                    frameworkScaleId={data.rating_scale_id}
+                    errors={messages}
+                    onChange={(patch) =>
+                        setData((current) => ({ ...current, ...patch }))
                     }
-                >
-                    {data.sections.map((section, sectionIndex) => {
-                        const sectionItems = data.items
-                            .map((item, index) => ({ item, index }))
-                            .filter(
-                                ({ item }) => item.section_key === section.key,
-                            );
-                        const itemTotal = sectionItems.reduce(
-                            (sum, { item }) => sum + (item.weight || 0),
-                            0,
-                        );
-
-                        return (
-                            <div
-                                key={section.key}
-                                className="rounded-lg border border-border"
-                            >
-                                <div className="flex items-start gap-2 border-b border-border bg-muted/30 p-3">
-                                    <GripVertical
-                                        className="mt-2 size-4 shrink-0 text-muted-foreground/50"
-                                        aria-hidden="true"
-                                    />
-                                    <div className="grid min-w-0 flex-1 gap-2 sm:grid-cols-[minmax(0,1fr)_6rem]">
-                                        <Input
-                                            value={section.name}
-                                            onChange={(event) =>
-                                                patchSection(sectionIndex, {
-                                                    name: event.target.value,
-                                                })
-                                            }
-                                            placeholder="Section name, e.g. Goals & delivery"
-                                            aria-label={`Section ${sectionIndex + 1} name`}
-                                        />
-                                        <Input
-                                            type="number"
-                                            min="0"
-                                            max="100"
-                                            value={section.weight}
-                                            onChange={(event) =>
-                                                patchSection(sectionIndex, {
-                                                    weight: Number(
-                                                        event.target.value,
-                                                    ),
-                                                })
-                                            }
-                                            aria-label={`Section ${sectionIndex + 1} weight`}
-                                            className="tabular-nums"
-                                        />
-                                        <Input
-                                            value={section.description}
-                                            onChange={(event) =>
-                                                patchSection(sectionIndex, {
-                                                    description:
-                                                        event.target.value,
-                                                })
-                                            }
-                                            placeholder="What this section is for (optional)"
-                                            aria-label={`Section ${sectionIndex + 1} description`}
-                                            className="sm:col-span-2"
-                                        />
-                                    </div>
-                                    <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="icon"
-                                        className="size-8 shrink-0 text-muted-foreground hover:text-destructive"
-                                        aria-label={`Remove section ${sectionIndex + 1}`}
-                                        disabled={data.sections.length <= 1}
-                                        onClick={() =>
-                                            removeSection(sectionIndex)
-                                        }
-                                    >
-                                        <X className="size-4" />
-                                    </Button>
-                                </div>
-
-                                <ul className="divide-y divide-border">
-                                    {sectionItems.map(({ item, index }) => (
-                                        <li
-                                            key={index}
-                                            className="grid gap-2 p-3 sm:grid-cols-[minmax(0,1fr)_10rem_5rem_auto]"
-                                        >
-                                            <Input
-                                                value={item.name}
-                                                onChange={(event) =>
-                                                    patchItem(index, {
-                                                        name: event.target
-                                                            .value,
-                                                    })
-                                                }
-                                                placeholder="What is measured"
-                                                aria-label="Criterion name"
-                                            />
-                                            <FormSelect
-                                                value={
-                                                    item.rating_scale_id ===
-                                                    null
-                                                        ? 'inherit'
-                                                        : String(
-                                                              item.rating_scale_id,
-                                                          )
-                                                }
-                                                onChange={(value) =>
-                                                    patchItem(index, {
-                                                        rating_scale_id:
-                                                            value === 'inherit'
-                                                                ? null
-                                                                : Number(value),
-                                                    })
-                                                }
-                                                options={scaleOptions}
-                                            />
-                                            <Input
-                                                type="number"
-                                                min="0"
-                                                max="100"
-                                                value={item.weight}
-                                                onChange={(event) =>
-                                                    patchItem(index, {
-                                                        weight: Number(
-                                                            event.target.value,
-                                                        ),
-                                                    })
-                                                }
-                                                aria-label="Criterion weight"
-                                                className="tabular-nums"
-                                            />
-                                            <Button
-                                                type="button"
-                                                variant="ghost"
-                                                size="icon"
-                                                className="size-8 text-muted-foreground hover:text-destructive"
-                                                aria-label={`Remove ${item.name || 'criterion'}`}
-                                                onClick={() =>
-                                                    setData(
-                                                        'items',
-                                                        data.items.filter(
-                                                            (_, i) =>
-                                                                i !== index,
-                                                        ),
-                                                    )
-                                                }
-                                            >
-                                                <X className="size-4" />
-                                            </Button>
-                                        </li>
-                                    ))}
-                                </ul>
-
-                                <div className="flex flex-wrap items-center gap-2 border-t border-border p-3">
-                                    <FormSelect
-                                        value=""
-                                        onChange={(value) =>
-                                            addItem(section.key, value)
-                                        }
-                                        placeholder="Add a criterion…"
-                                        options={[
-                                            ...criteria
-                                                .filter(
-                                                    (criterion) =>
-                                                        criterion.is_active,
-                                                )
-                                                .map((criterion) => ({
-                                                    value: String(criterion.id),
-                                                    label: criterion.name,
-                                                })),
-                                            {
-                                                value: 'blank',
-                                                label: 'Something not in the catalogue…',
-                                            },
-                                        ]}
-                                        className="w-full sm:w-72"
-                                    />
-                                    <span
-                                        className={cn(
-                                            'text-xs tabular-nums',
-                                            sectionItems.length === 0
-                                                ? 'text-muted-foreground'
-                                                : Math.round(itemTotal) === 100
-                                                  ? 'text-emerald-600 dark:text-emerald-400'
-                                                  : 'text-amber-600 dark:text-amber-400',
-                                        )}
-                                    >
-                                        {sectionItems.length} criteria ·{' '}
-                                        {itemTotal}% within the section
-                                    </span>
-                                </div>
-                            </div>
-                        );
-                    })}
-
-                    {messages.items && (
-                        <p className="text-sm text-destructive">
-                            {messages.items}
-                        </p>
-                    )}
-                    {messages.sections && (
-                        <p className="text-sm text-destructive">
-                            {messages.sections}
-                        </p>
-                    )}
-                </ModalSection>
+                />
 
                 {/* ── The rating model ───────────────────────────────────── */}
                 <ModalSection

@@ -6,7 +6,12 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 
-export type SelectOption = { value: string; label: string };
+export type SelectOption = {
+    value: string;
+    label: string;
+    /** Offered but not choosable — a choice already spent elsewhere. */
+    disabled?: boolean;
+};
 
 type Props = {
     value: string;
@@ -55,7 +60,11 @@ export function FormSelect({
                     <SelectItem value={noneValue}>{placeholder}</SelectItem>
                 )}
                 {options.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
+                    <SelectItem
+                        key={option.value}
+                        value={option.value}
+                        disabled={option.disabled}
+                    >
                         {option.label}
                     </SelectItem>
                 ))}

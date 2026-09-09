@@ -14,10 +14,11 @@ use Illuminate\Support\Facades\DB;
 /**
  * The one path that opens an appraisal. Seeding a scorecard is not a copy of a
  * criteria list any more — it walks the framework's sections in order, resolves
- * the rating scale each item is actually measured on (its own, else the
- * criterion's, else the framework's), and **freezes all of it** onto the score
- * lines. That freeze is what lets a framework be retuned without disturbing an
- * appraisal already in flight.
+ * the words each item is asked in (the catalogue's, when it draws on one) and the
+ * rating scale it is actually measured on (its own, else the criterion's, else
+ * the framework's), and **freezes all of it** onto the score lines. That freeze is
+ * what lets a framework be retuned without disturbing an appraisal already in
+ * flight.
  *
  * Both the single "open an evaluation" action and the bulk cycle launch come
  * through here, so a scorecard is built the same way however it was started.
@@ -67,11 +68,13 @@ class EvaluationOpener
                 $ordered->map(function (ReviewTemplateItem $item, int $index) use ($sections, $template): array {
                     $section = $sections->get($item->section_key) ?? ReviewTemplate::fallbackSection();
 
+                    $wording = $this->wordingFor($item);
+
                     return [
                         'kpi_criterion_id' => $item->kpi_criterion_id,
                         'review_template_item_id' => $item->id,
-                        'label' => $item->name,
-                        'description' => $item->description,
+                        'label' => $wording['label'],
+                        'description' => $wording['description'],
                         'section_key' => $section['key'],
                         'section_name' => $section['name'],
                         'section_weight' => $section['weight'],
@@ -104,6 +107,23 @@ class EvaluationOpener
             ->exists();
 
         return $exists ? 'Already appraised in this cycle.' : null;
+    }
+
+    /**
+     * How a line is worded on the scorecard: a catalogue-backed line is asked in
+     * the catalogue's current words, so retitling a criterion reaches every
+     * framework drawing on it; a one-off line, and one whose criterion has since
+     * been archived, carries the wording the framework was saved with.
+     *
+     * @return array{label: string, description: string|null}
+     */
+    private function wordingFor(ReviewTemplateItem $item): array
+    {
+        $criterion = $item->criterion;
+
+        return $criterion === null
+            ? ['label' => $item->name, 'description' => $item->description]
+            : ['label' => $criterion->name, 'description' => $criterion->description];
     }
 
     /**

@@ -204,6 +204,76 @@ test('a framework can be scoped to departments', function () {
     expect(ReviewTemplate::firstOrFail()->applies_to_values)->toBe([(string) $department->id]);
 });
 
+test('a line drawing from the catalogue is worded by the catalogue, not by the client', function () {
+    actingAsSuperAdmin();
+    $criterion = KpiCriterion::factory()->create([
+        'name' => 'Quality of work',
+        'description' => 'Accuracy, thoroughness and overall standard of output.',
+    ]);
+
+    $this->post(route('setup.kpi.frameworks.store'), frameworkPayload([
+        'items' => [[
+            'section_key' => 'goals',
+            'kpi_criterion_id' => $criterion->id,
+            'name' => 'sample',
+            'description' => 'sample',
+            'weight' => 100,
+        ]],
+    ]))->assertSessionHasNoErrors();
+
+    expect(ReviewTemplateItem::firstOrFail())
+        ->name->toBe('Quality of work')
+        ->description->toBe('Accuracy, thoroughness and overall standard of output.');
+});
+
+test('a one-off line keeps the words it was written with', function () {
+    actingAsSuperAdmin();
+
+    $this->post(route('setup.kpi.frameworks.store'), frameworkPayload([
+        'items' => [[
+            'section_key' => 'goals',
+            'kpi_criterion_id' => null,
+            'name' => 'Shift handover quality',
+            'description' => 'How cleanly the next shift picks up.',
+            'weight' => 100,
+        ]],
+    ]))->assertSessionHasNoErrors();
+
+    expect(ReviewTemplateItem::firstOrFail())
+        ->name->toBe('Shift handover quality')
+        ->kpi_criterion_id->toBeNull();
+});
+
+test('a framework cannot measure the same criterion twice', function () {
+    actingAsSuperAdmin();
+    $criterion = KpiCriterion::factory()->create();
+
+    $this->post(route('setup.kpi.frameworks.store'), frameworkPayload([
+        'items' => [
+            ['section_key' => 'goals', 'kpi_criterion_id' => $criterion->id, 'name' => 'A', 'weight' => 100],
+            ['section_key' => 'values', 'kpi_criterion_id' => $criterion->id, 'name' => 'B', 'weight' => 100],
+        ],
+    ]))->assertSessionHasErrors('items.1.kpi_criterion_id');
+});
+
+test('the editor reads a catalogue line back in the catalogue\'s current words', function () {
+    actingAsSuperAdmin();
+    $criterion = KpiCriterion::factory()->create(['name' => 'Quality of work']);
+    $template = ReviewTemplate::factory()->create();
+    $template->items()->create([
+        'kpi_criterion_id' => $criterion->id,
+        'section_key' => 'overall',
+        'name' => 'sample',
+        'weight' => 100,
+        'sort_order' => 0,
+    ]);
+
+    $criterion->update(['name' => 'Craft quality']);
+
+    $this->get(route('setup.kpi.index'))
+        ->assertInertia(fn (Assert $page) => $page->where('templates.0.items.0.name', 'Craft quality'));
+});
+
 test('saving a framework replaces its items rather than duplicating them', function () {
     actingAsSuperAdmin();
     $this->post(route('setup.kpi.frameworks.store'), frameworkPayload());

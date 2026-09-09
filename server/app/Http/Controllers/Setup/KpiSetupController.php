@@ -58,7 +58,7 @@ class KpiSetupController extends Controller
      */
     private function templates(): Builder
     {
-        return ReviewTemplate::query()->with('items')->withCount(['items', 'evaluations'])->catalogueOrder();
+        return ReviewTemplate::query()->with('items.criterion')->withCount(['items', 'evaluations'])->catalogueOrder();
     }
 
     /**

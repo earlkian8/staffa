@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Setup;
 
+use App\Models\KpiCriterion;
 use App\Models\ReviewTemplate;
 use App\Support\Performance\RatingModel;
 use App\Support\TenantRule;
@@ -18,7 +19,9 @@ use Illuminate\Validation\Validator;
  *
  * Keys for sections and bands are derived here rather than trusted, so renaming
  * a section in the editor cannot orphan the items that point at it, and the
- * cross-references are checked before anything is written.
+ * cross-references are checked before anything is written. An item drawing from
+ * the criteria catalogue also has its wording taken from the catalogue, so a
+ * framework can never ask a question the criterion it names no longer stands for.
  */
 class ReviewTemplateRequest extends FormRequest
 {
@@ -77,19 +80,33 @@ class ReviewTemplateRequest extends FormRequest
     }
 
     /**
-     * Every item must sit in a section this framework actually declares, and the
-     * lowest band must start at zero — otherwise a result can fall through the
-     * rating model and come back unlabelled.
+     * Every item must sit in a section this framework actually declares, no
+     * criterion may be measured twice (that only splits its weight in two), and
+     * the lowest band must start at zero — otherwise a result can fall through
+     * the rating model and come back unlabelled.
      */
     public function withValidator(Validator $validator): void
     {
         $validator->after(function (Validator $validator): void {
             $keys = array_column($this->input('sections', []), 'key');
+            $seen = [];
 
             foreach ($this->input('items', []) as $index => $item) {
                 if (! in_array($item['section_key'] ?? null, $keys, true)) {
                     $validator->errors()->add("items.{$index}.section_key", 'This item is not in one of the framework’s sections.');
                 }
+
+                $criterion = $item['kpi_criterion_id'] ?? null;
+
+                if ($criterion === null) {
+                    continue;
+                }
+
+                if (in_array($criterion, $seen, true)) {
+                    $validator->errors()->add("items.{$index}.kpi_criterion_id", 'This criterion is already measured in this framework.');
+                }
+
+                $seen[] = $criterion;
             }
 
             $bands = $this->input('bands', []);
@@ -111,7 +128,51 @@ class ReviewTemplateRequest extends FormRequest
                 : array_values(array_map(strval(...), (array) $this->input('applies_to_values', []))),
             'sections' => $this->keyed($this->input('sections'), 'name', 'section'),
             'bands' => $this->keyed($this->input('bands'), 'label', 'band'),
+            'items' => $this->catalogued($this->input('items')),
         ]);
+    }
+
+    /**
+     * Take each catalogue-backed item's wording from the catalogue. The editor
+     * offers criteria as a choice rather than a free-text box, and the same has
+     * to hold for anything else posting here: otherwise a line can carry the name
+     * of one criterion while counting as another, which is invisible everywhere
+     * the two are read together. A one-off line — no criterion named — keeps the
+     * words it was written with.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function catalogued(mixed $rows): array
+    {
+        if (! is_array($rows)) {
+            return [];
+        }
+
+        $rows = array_values(array_filter($rows, is_array(...)));
+
+        $ids = array_values(array_filter(array_map(
+            fn (array $row): ?int => is_numeric($row['kpi_criterion_id'] ?? null)
+                ? (int) $row['kpi_criterion_id']
+                : null,
+            $rows,
+        )));
+
+        // Archived criteria still name the lines already drawing on them, so the
+        // trashed ones are read too rather than silently losing their wording.
+        $criteria = $ids === []
+            ? collect()
+            : KpiCriterion::withTrashed()->whereKey($ids)->get()->keyBy('id');
+
+        return array_map(function (array $row) use ($criteria): array {
+            $criterion = $criteria->get((int) ($row['kpi_criterion_id'] ?? 0));
+
+            if ($criterion instanceof KpiCriterion) {
+                $row['name'] = $criterion->name;
+                $row['description'] = $criterion->description;
+            }
+
+            return $row;
+        }, $rows);
     }
 
     /**

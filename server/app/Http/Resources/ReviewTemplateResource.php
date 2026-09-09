@@ -39,16 +39,23 @@ class ReviewTemplateResource extends JsonResource
             // to 100 still scores (weights are relative), but HR wants to see it.
             'section_weight_total' => round(array_sum(array_column($sections, 'weight')), 2),
 
-            'items' => $this->whenLoaded('items', fn () => $this->items->map(fn (ReviewTemplateItem $item): array => [
-                'id' => $item->id,
-                'kpi_criterion_id' => $item->kpi_criterion_id,
-                'rating_scale_id' => $item->rating_scale_id,
-                'section_key' => $item->section_key,
-                'name' => $item->name,
-                'description' => $item->description,
-                'weight' => (float) $item->weight,
-                'sort_order' => $item->sort_order,
-            ])->all()),
+            // A line drawing from the catalogue is shown in the catalogue's
+            // current words, so the editor never offers to save wording that has
+            // moved on. Its own copy stands in for a criterion since archived.
+            'items' => $this->whenLoaded('items', fn () => $this->items->map(function (ReviewTemplateItem $item): array {
+                $criterion = $item->relationLoaded('criterion') ? $item->criterion : null;
+
+                return [
+                    'id' => $item->id,
+                    'kpi_criterion_id' => $item->kpi_criterion_id,
+                    'rating_scale_id' => $item->rating_scale_id,
+                    'section_key' => $item->section_key,
+                    'name' => $criterion?->name ?? $item->name,
+                    'description' => $criterion?->description ?? $item->description,
+                    'weight' => (float) $item->weight,
+                    'sort_order' => $item->sort_order,
+                ];
+            })->all()),
 
             'items_count' => (int) ($this->items_count ?? 0),
             'evaluations_count' => (int) ($this->evaluations_count ?? 0),

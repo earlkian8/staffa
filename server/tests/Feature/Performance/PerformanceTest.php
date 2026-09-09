@@ -140,6 +140,28 @@ test('retuning a framework never rewrites an appraisal already opened', function
         ->and($evaluation->scores->firstWhere('section_key', 'goals')->section_name)->toBe('Goals');
 });
 
+test('a scorecard asks a catalogue criterion in the catalogue\'s current words', function () {
+    actingAsSuperAdmin();
+    $template = framework();
+    $period = EvaluationPeriod::factory()->create();
+    $employee = Employee::factory()->create();
+
+    KpiCriterion::where('name', 'Teamwork')->firstOrFail()->update([
+        'name' => 'Collaboration',
+        'description' => 'Works well across the team and beyond it.',
+    ]);
+
+    $this->post(route('performance.store'), [
+        'employee_id' => $employee->id,
+        'evaluation_period_id' => $period->id,
+    ])->assertRedirect();
+
+    $line = PerformanceEvaluation::firstOrFail()->scores->firstWhere('section_key', 'values');
+
+    expect($line->label)->toBe('Collaboration')
+        ->and($line->description)->toBe('Works well across the team and beyond it.');
+});
+
 test('an appraisal cannot be opened in a cycle that is not open', function () {
     actingAsSuperAdmin();
     framework();
