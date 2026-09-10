@@ -10,6 +10,7 @@ import LeaveTypesStep from '@/features/setup-wizard/components/leave-types-step'
 import PerformanceStep from '@/features/setup-wizard/components/performance-step';
 import RecruitmentStep from '@/features/setup-wizard/components/recruitment-step';
 import StepFooter from '@/features/setup-wizard/components/step-footer';
+import ToastClearance from '@/features/setup-wizard/components/toast-clearance';
 import WizardRail from '@/features/setup-wizard/components/wizard-rail';
 import { STEP_META, STEPS } from '@/features/setup-wizard/constants';
 import type {
@@ -66,6 +67,8 @@ export default function SetupWizardPage() {
     return (
         <>
             <Head title="Company setup" />
+
+            <ToastClearance />
 
             <div className="flex h-dvh overflow-hidden bg-background">
                 <WizardRail

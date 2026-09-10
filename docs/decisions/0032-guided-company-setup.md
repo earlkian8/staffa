@@ -74,6 +74,13 @@ in a wizard they may not use.
 **Companies that predate the wizard were back-filled as complete.** Nobody is sent
 through setup for a company they have been running for months.
 
+**Toasts stayed.** A step confirms itself the way every other save in the app does, and
+says what it created. What changed instead is where the toast sits: the wizard is the
+only surface with a pinned action bar bottom-right, so `components/ui/sonner.tsx` now
+takes its bottom offset from a CSS variable (defaulting to sonner's own value) and the
+wizard sets it. Moving the confirmation was the fix; removing it would have made the
+wizard the one place in the app where a save says nothing.
+
 ## Consequences
 
 - A new tenant reaches a working system in about five minutes, and the four heaviest

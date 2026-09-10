@@ -116,7 +116,7 @@ class SetupWizardController extends Controller
             subjectLabel: $organization->name,
         );
 
-        return $this->completed(CompanySetup::COMPANY);
+        return $this->completed(CompanySetup::COMPANY, 'Company profile saved.');
     }
 
     /**
@@ -138,7 +138,10 @@ class SetupWizardController extends Controller
             logName: 'company-setup',
         );
 
-        return $this->completed(CompanySetup::DEPARTMENTS);
+        return $this->completed(
+            CompanySetup::DEPARTMENTS,
+            $created.' '.str('department')->plural($created).' added.',
+        );
     }
 
     /**
@@ -154,7 +157,10 @@ class SetupWizardController extends Controller
             logName: 'company-setup',
         );
 
-        return $this->completed(CompanySetup::LEAVE_TYPES);
+        return $this->completed(
+            CompanySetup::LEAVE_TYPES,
+            $created.' leave '.str('type')->plural($created).' added.',
+        );
     }
 
     /**
@@ -174,7 +180,7 @@ class SetupWizardController extends Controller
             subjectLabel: $pipeline->name,
         );
 
-        return $this->completed(CompanySetup::RECRUITMENT);
+        return $this->completed(CompanySetup::RECRUITMENT, "\"{$pipeline->name}\" is ready to hire on.");
     }
 
     /**
@@ -195,7 +201,7 @@ class SetupWizardController extends Controller
             subjectLabel: $template->name,
         );
 
-        return $this->completed(CompanySetup::PERFORMANCE);
+        return $this->completed(CompanySetup::PERFORMANCE, "\"{$template->name}\" is ready to review against.");
     }
 
     /**
@@ -236,18 +242,20 @@ class SetupWizardController extends Controller
     }
 
     /**
-     * Record a finished step and stay on the wizard, so the client decides what
-     * to show next.
+     * Record a finished step, report it, and stay on the wizard so the client
+     * decides what to show next.
      *
-     * Deliberately silent. Everywhere else in the app a save is confirmed by a
-     * toast, because nothing else on screen changes; here the wizard advances,
-     * the rung ticks and the progress bar moves the moment the server says yes —
-     * a toast on top of that is noise, and it lands on the button the owner is
-     * about to press next.
+     * A step confirms itself the same way every other save in the app does — a
+     * toast — and says what it actually created, which the screen it moves on to
+     * no longer shows. The wizard lifts the toaster clear of its own footer
+     * (see `setup/wizard.tsx`) so the confirmation never covers the button the
+     * owner is about to press.
      */
-    private function completed(string $step): RedirectResponse
+    private function completed(string $step, string $message): RedirectResponse
     {
         CompanySetup::markStep($this->organization(), $step, CompanySetup::DONE);
+
+        Inertia::flash('toast', ['type' => 'success', 'message' => $message]);
 
         return back();
     }

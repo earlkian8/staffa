@@ -78,9 +78,12 @@ owner there once.
   workspace picker use, because setup is the last stretch of the road that starts at
   registration. Its ladder is a record rather than decoration: a tick for done, a dash
   for skipped, the number otherwise.
-- **Steps deliberately do not flash a toast.** Elsewhere a save needs one because nothing
-  else changes; here the screen advances, the rung ticks and the bar moves — and a toast
-  lands on the button about to be pressed. Finishing flashes one, on the dashboard.
+- **The toaster moves out of the wizard's way.** Toasts land bottom-right, which
+  everywhere else is empty space; the wizard is the one surface with a pinned action bar
+  there, and a step's confirmation was landing on **Save and continue**.
+  `components/ui/sonner.tsx` now takes its bottom offset from
+  `--app-toast-offset-bottom` (defaulting to sonner's own value), and the wizard sets it
+  — 27px of clearance at 1440px, 29px at 390px, every other page untouched.
 - Company Setup → **Setup Guide** in the sidebar, so a step skipped on day one is not
   lost.
 

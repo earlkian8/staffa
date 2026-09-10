@@ -37,9 +37,10 @@ The step ladder is free to move around — the steps are independent. A step who
 the signed-in person may not configure is **shown, not hidden**, marked "No access", with
 skipping as its forward action.
 
-**Steps do not flash a toast.** Everywhere else a save is confirmed by one because
-nothing else on screen changes; here the wizard advances, the rung ticks and the progress
-bar moves the moment the server says yes. Finishing does flash one, on the dashboard.
+Each step confirms itself with a toast, saying what it created ("6 leave types added").
+The wizard is the app's only surface with a pinned action bar bottom-right, where toasts
+land, so it **lifts the toaster clear of its own footer** — see `toast-clearance.tsx` and
+the two variables `components/ui/sonner.tsx` reads.
 
 ## The redirect
 
@@ -108,7 +109,12 @@ over `features/setup-wizard/`:
   card only styles `peer-checked`. A `bare` variant drops the card chrome where the row
   is already the surface (the leave table).
 - `components/wizard-rail.tsx`, `step-body.tsx`, `step-footer.tsx`,
-  `already-configured.tsx`, and one component per screen.
+  `already-configured.tsx`, `toast-clearance.tsx`, and one component per screen.
+- `components/ui/sonner.tsx` takes its bottom offset from
+  `--app-toast-offset-bottom` / `--app-toast-offset-bottom-mobile`, defaulting to
+  sonner's own values. The app mounts one `<Toaster>` globally, so that pair of
+  variables is how a page with a pinned action bar asks it to move; every other page
+  is exactly where it was.
 - `constants.ts` carries the step copy and the four Company Setup screens the wizard
   leaves out; `routes.ts` mirrors the named routes.
 
