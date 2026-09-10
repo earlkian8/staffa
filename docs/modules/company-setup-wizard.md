@@ -6,7 +6,8 @@ of the system reads from. Every step can be skipped, and a skip is remembered.
 
 > Status: **Active** · Route prefix: `/setup/wizard`
 > Sidebar: Company Setup → Setup Guide (gated by `setup.company.manage`)
-> See [ADR 0032](../decisions/0032-guided-company-setup.md).
+> See [ADR 0032](../decisions/0032-guided-company-setup.md) and
+> [ADR 0034](../decisions/0034-a-company-writes-its-own-setup.md).
 
 ## Why it exists
 
@@ -27,11 +28,35 @@ working pane beside it is the app's own light surface.
 | --- | --- |
 | Welcome | What the five steps are, and that any of them can wait. |
 | 1 · Company | Display name (required), legal name, logo, contact details, employer registration numbers (folded away — a company registering today may not have them). |
-| 2 · Departments | Tick suggested functions, and type any the company has of its own. Nothing is pre-ticked; a department list is genuinely different at every company. |
-| 3 · Leave | Tick kinds of leave and set the days each carries. The statutory PH entitlements are pre-ticked at the number the law sets. |
-| 4 · Hiring | Pick one process shape (Standard / Fast Track / Executive Search), optionally rename it. Each card shows its actual stages. |
-| 5 · Appraisals | Pick one framework (Balanced / Competency Review / Results & Conduct), optionally rename it. The selected card opens to show its sections and every criterion. |
+| 2 · Departments | Tick suggested functions, and name any the company has of its own. Nothing is pre-ticked; a department list is genuinely different at every company. |
+| 3 · Leave | Tick kinds of leave and set the days each carries, and define any others whole. The statutory PH entitlements are pre-ticked at the number the law sets. |
+| 4 · Hiring | Pick one process shape (Standard / Fast Track / Executive Search), or draw the company's own stages. Each card shows its actual stages. |
+| 5 · Appraisals | Pick one framework (Balanced / Competency Review / Results & Conduct), or design one — sections, weights, criteria and the words a result is reported in. The selected card opens to show its sections and every criterion. |
 | Finish | What landed where, with "Do it now" on anything still open, plus the four Company Setup screens the wizard leaves out. |
+
+## Choose one, then make it yours
+
+Every offer carries a **Customise** action, and every step a way to start from nothing
+(ADR 0034). Customising lifts an offer out of the suggestion list and into the
+company's own — prefilled, so nobody faces an empty form unless they ask to — and the
+suggestion then reads "In your list" rather than staying on offer twice.
+
+| Step | What the company can write | What stays the server's |
+| --- | --- | --- |
+| Departments | Name, code, description | The wording of a **ticked** suggestion |
+| Leave | Name, code, description, colour, days, and the paid / half-day / approval flags | Everything about a **ticked** suggestion but its days — a statutory entitlement is not a request-body field |
+| Hiring | The process name, every stage name, and their order | A stage's `kind`, and the rule that a process has exactly one hired stage and at least one rejected one |
+| Appraisals | The framework's name and description, its sections and weights, which criteria sit where and at what weight, the wording of a criterion it writes, and the rating bands | A **catalogue** criterion's wording (resolved from its key) and every rating scale, which is named from the shared library rather than described |
+
+Anything the company writes is held to the rules its module's own screen enforces, so
+the wizard cannot create something Company Setup would refuse to save. A criterion the
+company writes here joins its **criteria catalogue** — unlike a one-off in the framework
+editor, which stays inside the one framework: in the wizard there is no catalogue yet,
+and writing a criterion is how it gets built.
+
+Designing a **rating scale** is the one thing the wizard leaves out. A scale has bounds
+and anchors the whole scoring apparatus reads; the six-instrument library is offered
+instead, and Company Setup → Performance Framework is one click away.
 
 The step ladder is free to move around — the steps are independent. A step whose module
 the signed-in person may not configure is **shown, not hidden**, marked "No access", with
@@ -82,17 +107,29 @@ complete by the migration.
   `PENDING`, `ABILITIES`) and the progress reads/writes. `resumeStep()` answers the first
   step still unanswered.
 - **`Support\Setup\SetupBlueprints`** — every starting point the wizard offers:
-  departments, leave types, pipelines, the criteria catalogue, and the frameworks that
-  draw on it. Blueprints are resolved from here by **key**, never trusted as content.
-- **`Support\Setup\BlueprintInstaller`** — writes a chosen blueprint into the current
-  tenant. Every method is idempotent against what the company already has, so a double
-  submit (or a second owner walking the wizard) cannot produce two "Vacation Leave"s.
-  Scales and criteria resolve **by name**, so adopting a blueprint next to existing
-  configuration reuses the catalogue rather than splitting it.
+  departments, leave types, pipelines, the criteria catalogue, the frameworks that draw
+  on it, and the instrument library a bespoke framework measures on. Blueprints are
+  resolved from here by **key**, never trusted as content.
+- **`Support\Setup\SetupDefinition`** — where an adopted answer and a bespoke one
+  become the same thing. A blueprint key is resolved; the company's own definition is
+  taken as written, except for the parts the modules downstream read as meaning, which
+  are resolved from `SetupBlueprints` either way.
+- **`Support\Setup\SetupInstaller`** (was `BlueprintInstaller`) — writes a definition
+  into the current tenant, without knowing which route it came by. Every method is
+  idempotent against what the company already has, so a double submit (or a second owner
+  walking the wizard) cannot produce two "Vacation Leave"s. Scales and criteria resolve
+  **by name**, so a second framework that also measures "Communication" reuses the
+  catalogue rather than splitting it.
 - **`Support\Setup\CompanyProfileWriter`** — the shared profile write, called by both
   this wizard and `CompanyProfileController`.
 - **FormRequests** in `Http/Requests/Setup/Wizard/` — one per step, plus `WizardSkipRequest`.
-  The company step reuses `UpdateCompanyProfileRequest` unchanged.
+  The company step reuses `UpdateCompanyProfileRequest` unchanged. The other four each
+  validate two answers: a blueprint key, or the company's own definition held to the
+  rules of the module's own request (`LeaveTypeRequest`,
+  `StoreRecruitmentPipelineRequest`, `ReviewTemplateRequest`). A leave type or
+  department left without a code gets one derived from its name — initials for a
+  multi-word leave type ("Typhoon Leave" → `TL`), so a derived code looks like the ones
+  the blueprints carry.
 - Mutations are activity-logged (`logName: 'company-setup'`, and `'recruitment'` for the
   pipeline), described as happening "during company setup".
 
@@ -107,9 +144,18 @@ over `features/setup-wizard/`:
 - `components/choice-card.tsx` — the wizard's main control. The real radio/checkbox stays
   in the DOM, visually hidden, so keyboard and screen readers behave natively and the
   card only styles `peer-checked`. A `bare` variant drops the card chrome where the row
-  is already the surface (the leave table).
+  is already the surface (the leave table); an `action` slot carries **Customise**,
+  swallowing its own click so pressing it never also ticks the box.
+- `components/custom-section.tsx`, `leave-type-fields.tsx`, `stage-editor.tsx` and
+  `framework-editor.tsx` — what the company writes for itself. Everything bespoke sits
+  on a **dashed hairline**, the same signal the framework editor already uses for a
+  criterion written by hand: the difference from an offer is authorship, not importance,
+  so it is drawn without a second accent colour.
 - `components/wizard-rail.tsx`, `step-body.tsx`, `step-footer.tsx`,
   `already-configured.tsx`, `toast-clearance.tsx`, and one component per screen.
+- `features/kpi-config/components/weight-controls.tsx` — the percent box, the running
+  tally and the split-evenly arithmetic, shared with the framework editor under Company
+  Setup so a weight reads and computes the same in both.
 - `components/ui/sonner.tsx` takes its bottom offset from
   `--app-toast-offset-bottom` / `--app-toast-offset-bottom-mobile`, defaulting to
   sonner's own values. The app mounts one `<Toaster>` globally, so that pair of
@@ -137,7 +183,8 @@ No new permission was added. Built-in **HR Manager** (the owner) holds all five.
 
 - **Company Profile** — step 1 is the same payload, validation and writer.
 - **Departments / Leave Types / Recruitment Pipelines / Performance Framework** — each
-  step creates records those screens read back and edit as normal.
+  step creates records those screens read back and edit as normal, whether the company
+  adopted an offer or wrote its own.
 - **Seeding** — `OrganizationSeeder` marks a seeded tenant complete, so the demo account
   lands on the dashboard rather than the wizard.
 - **Tests** — `OrganizationFactory` defaults to a company already in use;

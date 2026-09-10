@@ -9,6 +9,7 @@ use App\Models\RecruitmentPipeline;
 use App\Models\ReviewTemplate;
 use App\Models\User;
 use App\Support\OrganizationProvisioner;
+use App\Support\Performance\RatingModel;
 use App\Support\Setup\CompanySetup;
 use App\Support\Setup\SetupBlueprints;
 use App\Support\Tenancy;
@@ -220,6 +221,28 @@ test('a suggested department the company already has is passed over rather than 
         ->and(Department::count())->toBe(2);
 });
 
+test('a customised suggestion is created in the company own words', function () {
+    actingAsSuperAdmin();
+    unfinishedTenant();
+
+    // The wizard "customises" a suggestion by moving it out of the ticked list
+    // and into the typed one, pre-filled — so this is what the server sees.
+    $this->post(route('setup.wizard.departments'), [
+        'codes' => [],
+        'custom' => [[
+            'name' => 'People & Culture',
+            'code' => 'HR',
+            'description' => 'Hiring, records and everything that keeps people here.',
+        ]],
+    ])->assertSessionHasNoErrors();
+
+    $department = Department::firstOrFail();
+
+    expect($department->name)->toBe('People & Culture')
+        ->and($department->code)->toBe('HR')
+        ->and($department->description)->toBe('Hiring, records and everything that keeps people here.');
+});
+
 // ── Step 3: leave types ──────────────────────────────────────────────────────
 
 test('the leave step creates the ticked types at the days given', function () {
@@ -267,6 +290,99 @@ test('the leave step does not duplicate a code the company already uses', functi
         ->assertSessionHasNoErrors();
 
     expect(LeaveType::where('code', 'VL')->count())->toBe(1);
+});
+
+test('the leave step creates a kind of leave the company wrote itself', function () {
+    actingAsSuperAdmin();
+    $organization = unfinishedTenant();
+
+    $this->post(route('setup.wizard.leave-types'), [
+        'codes' => [],
+        'days' => [],
+        'custom' => [[
+            'name' => 'Typhoon Leave',
+            'code' => 'tl',
+            'description' => 'Days the office is closed by a storm signal.',
+            'color' => '#0EA5E9',
+            'default_days' => 4,
+            'is_paid' => true,
+            'allow_half_day' => false,
+            'requires_approval' => false,
+        ]],
+    ])->assertSessionHasNoErrors();
+
+    $type = LeaveType::firstOrFail();
+
+    expect($type->name)->toBe('Typhoon Leave')
+        ->and($type->code)->toBe('TL')
+        ->and((float) $type->default_days)->toBe(4.0)
+        ->and($type->allow_half_day)->toBeFalse()
+        ->and($type->requires_approval)->toBeFalse()
+        ->and($type->is_active)->toBeTrue()
+        ->and(CompanySetup::statuses($organization->refresh())['leave-types'])->toBe(CompanySetup::DONE);
+});
+
+test('a customised statutory leave keeps the company own wording and days', function () {
+    actingAsSuperAdmin();
+    unfinishedTenant();
+
+    $this->post(route('setup.wizard.leave-types'), [
+        'codes' => ['SL'],
+        'days' => ['SL' => 12],
+        'custom' => [[
+            'name' => 'Vacation Leave (probationary)',
+            'code' => 'VLP',
+            'color' => '#0ABFBF',
+            'default_days' => 5,
+            'is_paid' => true,
+        ]],
+    ])->assertSessionHasNoErrors();
+
+    expect(LeaveType::pluck('code')->sort()->values()->all())->toBe(['SL', 'VLP'])
+        ->and((float) LeaveType::where('code', 'VLP')->value('default_days'))->toBe(5.0)
+        // A ticked suggestion still carries the policy the blueprint sets.
+        ->and(LeaveType::where('code', 'SL')->value('name'))->toBe('Sick Leave');
+});
+
+test('a leave type left without a code gets one in the shape codes take', function (string $name, string $code) {
+    actingAsSuperAdmin();
+    unfinishedTenant();
+
+    $this->post(route('setup.wizard.leave-types'), [
+        'codes' => [],
+        'days' => [],
+        'custom' => [['name' => $name, 'code' => '', 'color' => '#0ABFBF', 'default_days' => 3]],
+    ])->assertSessionHasNoErrors();
+
+    expect(LeaveType::where('name', $name)->value('code'))->toBe($code);
+})->with([
+    'initials, for a name with several words' => ['Typhoon Leave', 'TL'],
+    'and three letters for one without' => ['Sabbatical', 'SAB'],
+]);
+
+test('the leave step refuses a code claimed twice in one submission', function () {
+    actingAsSuperAdmin();
+    unfinishedTenant();
+
+    $this->post(route('setup.wizard.leave-types'), [
+        'codes' => ['VL'],
+        'days' => [],
+        'custom' => [['name' => 'Vacation', 'code' => 'VL', 'color' => '#0ABFBF', 'default_days' => 10]],
+    ])->assertSessionHasErrors('custom.0.code');
+
+    expect(LeaveType::count())->toBe(0);
+});
+
+test('the leave step refuses a code the company already uses', function () {
+    actingAsSuperAdmin();
+    unfinishedTenant();
+    LeaveType::factory()->create(['code' => 'TL', 'name' => 'Training Leave']);
+
+    $this->post(route('setup.wizard.leave-types'), [
+        'codes' => [],
+        'days' => [],
+        'custom' => [['name' => 'Typhoon Leave', 'code' => 'TL', 'color' => '#0ABFBF', 'default_days' => 4]],
+    ])->assertSessionHasErrors('custom.0.code');
 });
 
 // ── Step 4: recruitment ──────────────────────────────────────────────────────
@@ -322,6 +438,84 @@ test('a second pipeline does not steal the default from the first', function () 
 
     expect(RecruitmentPipeline::where('is_default', true)->count())->toBe(1)
         ->and(RecruitmentPipeline::where('name', 'Executive Search')->value('is_default'))->toBeFalse();
+});
+
+test('the hiring step creates a process the company drew itself', function () {
+    actingAsSuperAdmin();
+    $organization = unfinishedTenant();
+
+    $this->post(route('setup.wizard.recruitment'), [
+        'source' => 'custom',
+        'name' => 'Barista Hiring',
+        'stages' => [
+            ['name' => 'Walk-in', 'kind' => 'open'],
+            ['name' => 'Trial shift', 'kind' => 'open'],
+            ['name' => 'On the crew', 'kind' => 'won'],
+            ['name' => 'Not this time', 'kind' => 'lost'],
+        ],
+    ])->assertSessionHasNoErrors();
+
+    $pipeline = RecruitmentPipeline::with('stages')->firstOrFail();
+
+    expect($pipeline->name)->toBe('Barista Hiring')
+        ->and($pipeline->is_default)->toBeTrue()
+        ->and($pipeline->stages->pluck('name')->all())
+        ->toBe(['Walk-in', 'Trial shift', 'On the crew', 'Not this time'])
+        ->and($pipeline->wonStage()->name)->toBe('On the crew')
+        ->and($pipeline->entryStage()->name)->toBe('Walk-in')
+        ->and(CompanySetup::statuses($organization->refresh())['recruitment'])->toBe(CompanySetup::DONE);
+});
+
+test('a hand-drawn process still needs somewhere to be hired and somewhere not to be', function (array $stages) {
+    actingAsSuperAdmin();
+    unfinishedTenant();
+
+    $this->post(route('setup.wizard.recruitment'), [
+        'source' => 'custom',
+        'name' => 'Half a process',
+        'stages' => $stages,
+    ])->assertSessionHasErrors('stages');
+
+    expect(RecruitmentPipeline::count())->toBe(0);
+})->with([
+    'no hired stage' => [[['name' => 'Applied', 'kind' => 'open'], ['name' => 'Rejected', 'kind' => 'lost']]],
+    'two hired stages' => [[['name' => 'Hired', 'kind' => 'won'], ['name' => 'Signed', 'kind' => 'won'], ['name' => 'No', 'kind' => 'lost']]],
+    'nowhere to be rejected' => [[['name' => 'Applied', 'kind' => 'open'], ['name' => 'Hired', 'kind' => 'won']]],
+]);
+
+test('a hand-drawn process has to be called something, and its blank stages are dropped', function () {
+    actingAsSuperAdmin();
+    unfinishedTenant();
+
+    $this->post(route('setup.wizard.recruitment'), [
+        'source' => 'custom',
+        'name' => '',
+        'stages' => [['name' => 'Applied', 'kind' => 'open'], ['name' => 'Hired', 'kind' => 'won'], ['name' => 'No', 'kind' => 'lost']],
+    ])->assertSessionHasErrors('name');
+
+    $this->post(route('setup.wizard.recruitment'), [
+        'source' => 'custom',
+        'name' => 'Crew Hiring',
+        'stages' => [
+            ['name' => 'Applied', 'kind' => 'open'],
+            ['name' => '   ', 'kind' => 'open'],
+            ['name' => 'Hired', 'kind' => 'won'],
+            ['name' => 'No', 'kind' => 'lost'],
+        ],
+    ])->assertSessionHasNoErrors();
+
+    expect(RecruitmentPipeline::first()->stages)->toHaveCount(3);
+});
+
+test('a stage kind is resolved against what recruitment understands', function () {
+    actingAsSuperAdmin();
+    unfinishedTenant();
+
+    $this->post(route('setup.wizard.recruitment'), [
+        'source' => 'custom',
+        'name' => 'Nonsense',
+        'stages' => [['name' => 'Applied', 'kind' => 'maybe'], ['name' => 'Hired', 'kind' => 'won'], ['name' => 'No', 'kind' => 'lost']],
+    ])->assertSessionHasErrors('stages.0.kind');
 });
 
 // ── Step 5: performance framework ────────────────────────────────────────────
@@ -391,6 +585,168 @@ test('the appraisal step refuses a blueprint that is not on offer', function () 
         ->assertSessionHasErrors('blueprint');
 
     expect(ReviewTemplate::count())->toBe(0);
+});
+
+test('the appraisal step builds a framework the company designed itself', function () {
+    actingAsSuperAdmin();
+    $organization = unfinishedTenant();
+
+    $this->post(route('setup.wizard.performance'), [
+        'source' => 'custom',
+        'name' => 'Crew Review',
+        'description' => 'What we ask of everyone on shift.',
+        'scale' => 'Expectation rating',
+        'result_display' => 'percent',
+        'sections' => [
+            ['key' => 'floor', 'name' => 'On the floor', 'description' => 'The shift itself.', 'weight' => 70],
+            ['key' => 'team', 'name' => 'With the team', 'description' => null, 'weight' => 30],
+        ],
+        'items' => [
+            // One drawn from the catalogue, one the company wrote.
+            ['section' => 'floor', 'weight' => 60, 'criterion' => 'quality_of_work'],
+            ['section' => 'floor', 'weight' => 40, 'name' => 'Shift handover', 'description' => 'The next shift starts where this one left off.', 'scale' => 'Met / not met'],
+            ['section' => 'team', 'weight' => 100, 'criterion' => 'teamwork'],
+        ],
+    ])->assertSessionHasNoErrors();
+
+    $template = ReviewTemplate::with('items')->firstOrFail();
+
+    expect($template->name)->toBe('Crew Review')
+        ->and($template->description)->toBe('What we ask of everyone on shift.')
+        ->and($template->result_display)->toBe('percent')
+        ->and($template->is_default)->toBeTrue()
+        ->and(collect($template->sections)->pluck('key')->all())->toBe(['floor', 'team'])
+        ->and(collect($template->sections)->pluck('weight')->map(floatval(...))->all())->toBe([70.0, 30.0])
+        ->and($template->items)->toHaveCount(3)
+        // Every line is catalogue-backed, the company's own included — writing a
+        // criterion in the wizard is how the catalogue gets built.
+        ->and($template->items->whereNull('kpi_criterion_id'))->toHaveCount(0)
+        ->and($template->items->pluck('name')->all())
+        ->toBe(['Quality of work', 'Shift handover', 'Teamwork & collaboration'])
+        // A catalogue line takes the catalogue's wording, not the client's.
+        ->and($template->items->firstWhere('name', 'Quality of work')->description)
+        ->toBe('Accuracy, thoroughness and how much rework the output needs.')
+        ->and(KpiCriterion::where('name', 'Shift handover')->value('description'))
+        ->toBe('The next shift starts where this one left off.')
+        // Only the instruments this framework measures on.
+        ->and(RatingScale::pluck('name')->sort()->values()->all())
+        ->toBe(['5-point rating', 'Expectation rating', 'Met / not met'])
+        ->and(RatingScale::where('is_default', true)->value('name'))->toBe('Expectation rating')
+        ->and(CompanySetup::statuses($organization->refresh())['performance'])->toBe(CompanySetup::DONE);
+});
+
+test('a framework left alone about its rating model gets the standard ladder', function () {
+    actingAsSuperAdmin();
+    unfinishedTenant();
+
+    $this->post(route('setup.wizard.performance'), [
+        'source' => 'custom',
+        'name' => 'Two-liner',
+        'scale' => '5-point rating',
+        'result_display' => 'band',
+        'sections' => [['key' => 's1', 'name' => 'Everything', 'weight' => 100]],
+        'items' => [['section' => 's1', 'weight' => 100, 'criterion' => 'goal_attainment']],
+    ])->assertSessionHasNoErrors();
+
+    expect(collect(ReviewTemplate::firstOrFail()->bands)->pluck('label')->all())
+        ->toBe(collect(RatingModel::defaultBands())->pluck('label')->all());
+});
+
+test('a framework can report in the company own words, highest band first', function () {
+    actingAsSuperAdmin();
+    unfinishedTenant();
+
+    $this->post(route('setup.wizard.performance'), [
+        'source' => 'custom',
+        'name' => 'Ours',
+        'scale' => '5-point rating',
+        'result_display' => 'band',
+        'sections' => [['key' => 's1', 'name' => 'Everything', 'weight' => 100]],
+        'items' => [['section' => 's1', 'weight' => 100, 'criterion' => 'goal_attainment']],
+        'bands' => [
+            ['label' => 'Getting there', 'min_percent' => 0, 'tone' => 'caution', 'description' => null],
+            ['label' => 'One of the best', 'min_percent' => 85, 'tone' => 'positive', 'description' => 'The reference point.'],
+            ['label' => 'Solid', 'min_percent' => 50, 'tone' => 'neutral', 'description' => null],
+        ],
+    ])->assertSessionHasNoErrors();
+
+    $bands = collect(ReviewTemplate::firstOrFail()->bands);
+
+    expect($bands->pluck('label')->all())->toBe(['One of the best', 'Solid', 'Getting there'])
+        ->and($bands->pluck('key')->all())->toBe(['one_of_the_best', 'solid', 'getting_there']);
+});
+
+test('a designed framework is held to the shape the framework editor enforces', function (array $payload, string $field) {
+    actingAsSuperAdmin();
+    unfinishedTenant();
+
+    $base = [
+        'source' => 'custom',
+        'name' => 'Ours',
+        'scale' => '5-point rating',
+        'result_display' => 'band',
+        'sections' => [['key' => 's1', 'name' => 'Everything', 'weight' => 100]],
+        'items' => [['section' => 's1', 'weight' => 100, 'criterion' => 'goal_attainment']],
+    ];
+
+    $this->post(route('setup.wizard.performance'), array_replace($base, $payload))
+        ->assertSessionHasErrors($field);
+
+    expect(ReviewTemplate::count())->toBe(0);
+})->with([
+    'no name' => [['name' => ''], 'name'],
+    'an instrument that is not on offer' => [['scale' => 'Vibes (1-10)'], 'scale'],
+    'a result display that means nothing' => [['result_display' => 'stars'], 'result_display'],
+    'nothing to measure' => [['items' => []], 'items'],
+    'no sections' => [['sections' => []], 'sections'],
+    'a line in a section that does not exist' => [
+        ['items' => [['section' => 'nowhere', 'weight' => 100, 'criterion' => 'goal_attainment']]],
+        'items',
+    ],
+    'the same criterion twice' => [
+        ['items' => [
+            ['section' => 's1', 'weight' => 50, 'criterion' => 'goal_attainment'],
+            ['section' => 's1', 'weight' => 50, 'criterion' => 'goal_attainment'],
+        ]],
+        'items.1.criterion',
+    ],
+    'a criterion that is not in the catalogue' => [
+        ['items' => [['section' => 's1', 'weight' => 100, 'criterion' => 'vibes']]],
+        'items.0.criterion',
+    ],
+    'a rating model nothing can fall into' => [
+        ['bands' => [
+            ['label' => 'Good', 'min_percent' => 60, 'tone' => 'good'],
+            ['label' => 'Great', 'min_percent' => 90, 'tone' => 'positive'],
+        ]],
+        'bands',
+    ],
+]);
+
+test('a designed framework reuses a criterion the company already has', function () {
+    actingAsSuperAdmin();
+    unfinishedTenant();
+
+    $scale = RatingScale::create([
+        'name' => '5-point rating', 'description' => 'Ours', 'type' => 'numeric',
+        'min' => 1, 'max' => 5, 'step' => 1, 'levels' => null, 'is_default' => true,
+    ]);
+    KpiCriterion::create([
+        'name' => 'Shift handover', 'description' => 'Our own wording.',
+        'weight' => 40, 'rating_scale_id' => $scale->id, 'is_active' => true, 'sort_order' => 1,
+    ]);
+
+    $this->post(route('setup.wizard.performance'), [
+        'source' => 'custom',
+        'name' => 'Crew Review',
+        'scale' => '5-point rating',
+        'result_display' => 'band',
+        'sections' => [['key' => 's1', 'name' => 'Everything', 'weight' => 100]],
+        'items' => [['section' => 's1', 'weight' => 100, 'name' => 'Shift handover', 'description' => 'Different words.']],
+    ])->assertSessionHasNoErrors();
+
+    expect(KpiCriterion::where('name', 'Shift handover')->count())->toBe(1)
+        ->and(KpiCriterion::where('name', 'Shift handover')->value('description'))->toBe('Our own wording.');
 });
 
 // ── Skipping and finishing ───────────────────────────────────────────────────

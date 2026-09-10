@@ -25,6 +25,7 @@ import type {
     ReviewTemplateOption,
 } from '@/features/performance/types';
 import { cn } from '@/lib/utils';
+import { RESULT_DISPLAYS } from '../constants';
 import { kpiConfigRoutes } from '../routes';
 import type {
     AudienceOptions,
@@ -33,25 +34,6 @@ import type {
 } from '../types';
 import type { ItemDraft, SectionDraft } from './measurement-editor';
 import { MeasurementEditor } from './measurement-editor';
-
-const RESULT_DISPLAYS: { value: ResultDisplay; label: string; hint: string }[] =
-    [
-        {
-            value: 'band',
-            label: 'The rating',
-            hint: 'The scorecard leads with the band — "Exceeds Expectations".',
-        },
-        {
-            value: 'percent',
-            label: 'Attainment',
-            hint: 'The scorecard leads with the number — "78.4%".',
-        },
-        {
-            value: 'points',
-            label: 'Points out of 5',
-            hint: 'The scorecard leads with the 1–5 index.',
-        },
-    ];
 
 const AUDIENCES: {
     value: ReviewTemplateOption['applies_to'];

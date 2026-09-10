@@ -19,6 +19,13 @@ use App\Support\Performance\RatingScales;
  * The performance blueprints draw their instruments from
  * {@see RatingScales::library()}, so a company that starts here measures on the
  * same scales it would have built by hand.
+ *
+ * A company is never held to what is in here: every step of the wizard also
+ * accepts the company's own definitions, and {@see SetupDefinition} is where a
+ * posted key and a posted definition become the same thing. What stays
+ * server-side either way is the *vocabulary with meaning attached* — a stage
+ * kind, a statutory entitlement, the shape of an instrument — because those are
+ * what the modules downstream read.
  */
 class SetupBlueprints
 {
@@ -300,6 +307,37 @@ class SetupBlueprints
                 ],
             ],
         ];
+    }
+
+    /**
+     * The instruments a framework can measure on — {@see RatingScales::library()}
+     * with the three-word descriptor the client shows next to each name.
+     *
+     * A company designing its own framework in the wizard picks from these
+     * rather than defining a scale: a scale is an instrument with anchors and
+     * bounds, and the screen that does it properly (Company Setup → Performance
+     * framework) is one click away once setup is done.
+     *
+     * @return list<array{name: string, description: string, type: string, descriptor: string}>
+     */
+    public static function instruments(): array
+    {
+        return array_map(fn (array $scale): array => [
+            'name' => $scale['name'],
+            'description' => $scale['description'],
+            'type' => $scale['type'],
+            'descriptor' => RatingScales::descriptor($scale),
+        ], RatingScales::library());
+    }
+
+    /**
+     * One catalogue criterion by its key, or null when nothing carries it.
+     *
+     * @return array{name: string, description: string, weight: float, scale: string}|null
+     */
+    public static function criterion(?string $key): ?array
+    {
+        return self::criteria()[$key] ?? null;
     }
 
     /**

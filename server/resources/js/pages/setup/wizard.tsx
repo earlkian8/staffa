@@ -179,6 +179,10 @@ export default function SetupWizardPage() {
                                 <PerformanceStep
                                     {...stepProps}
                                     blueprints={blueprints.frameworks}
+                                    criteria={blueprints.criteria}
+                                    instruments={blueprints.instruments}
+                                    bands={blueprints.bands}
+                                    tones={blueprints.tones}
                                     existing={existing.frameworks}
                                 />
                             )}

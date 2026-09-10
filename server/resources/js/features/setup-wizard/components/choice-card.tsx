@@ -14,6 +14,12 @@ type Props = {
     description?: ReactNode;
     /** Shown at the top right — a count, a badge, a hint. */
     aside?: ReactNode;
+    /**
+     * An action the card carries rather than a choice it offers — "Customise",
+     * typically. It sits inside the label so it travels with the card, and
+     * swallows its own click so pressing it never also ticks the box.
+     */
+    action?: ReactNode;
     /** The detail a card opens up to show: stages, sections, criteria. */
     children?: ReactNode;
     disabled?: boolean;
@@ -44,6 +50,7 @@ export default function ChoiceCard({
     title,
     description,
     aside,
+    action,
     children,
     disabled = false,
     className,
@@ -105,6 +112,20 @@ export default function ChoiceCard({
                 </span>
 
                 {children && <span className="block">{children}</span>}
+
+                {action && (
+                    <span
+                        className="block"
+                        // The card is a label: without this, pressing the button
+                        // inside it would also toggle the control it points at.
+                        onClick={(event) => {
+                            event.preventDefault();
+                            event.stopPropagation();
+                        }}
+                    >
+                        {action}
+                    </span>
+                )}
             </span>
         </label>
     );

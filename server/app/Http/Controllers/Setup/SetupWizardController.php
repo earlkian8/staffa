@@ -17,10 +17,12 @@ use App\Models\Organization;
 use App\Models\RecruitmentPipeline;
 use App\Models\ReviewTemplate;
 use App\Support\ActivityLogger;
-use App\Support\Setup\BlueprintInstaller;
+use App\Support\Performance\RatingModel;
 use App\Support\Setup\CompanyProfileWriter;
 use App\Support\Setup\CompanySetup;
 use App\Support\Setup\SetupBlueprints;
+use App\Support\Setup\SetupDefinition;
+use App\Support\Setup\SetupInstaller;
 use App\Support\Tenancy;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -37,13 +39,19 @@ use Inertia\Response;
  * the company's own identity, its org structure, the leave it grants, how it
  * hires, and how it appraises.
  *
- * Three rules hold across every step:
+ * Four rules hold across every step:
  *
  *  - **Every step can be skipped**, and a skip is recorded rather than forgotten,
  *    so the wizard resumes past it instead of asking twice.
  *  - **Nothing here is a hidden default.** A step writes only what the owner
- *    picked, from {@see SetupBlueprints}; leaving the wizard without touching it
- *    leaves the company exactly as empty as it was.
+ *    settled on — one of the offers in {@see SetupBlueprints}, or the company's
+ *    own; leaving the wizard without touching it leaves the company exactly as
+ *    empty as it was.
+ *  - **A company is never held to the offers.** Every step also accepts
+ *    definitions the company wrote — its own departments, kinds of leave, hiring
+ *    stages, appraisal sections and criteria. Adopted and bespoke answers meet
+ *    in {@see SetupDefinition} and are written by the same installer, so what
+ *    the wizard builds is a real, editable module configuration either way.
  *  - **Steps configure real modules**, so each is gated by that module's own
  *    permission ({@see CompanySetup::ABILITIES}) — the wizard is a route through
  *    Company Setup, not a way around it. A step the signed-in user may not do is
@@ -82,6 +90,15 @@ class SetupWizardController extends Controller
                 'leaveTypes' => SetupBlueprints::leaveTypes(),
                 'pipelines' => SetupBlueprints::pipelines(),
                 'frameworks' => $this->frameworkBlueprints(),
+
+                // What a company designing its own framework draws on: the
+                // criteria catalogue as a list it can pick from, the instruments
+                // it can measure on, and the ladder a result is reported in
+                // unless it writes its own.
+                'criteria' => $this->criteriaCatalogue(),
+                'instruments' => SetupBlueprints::instruments(),
+                'bands' => RatingModel::defaultBands(),
+                'tones' => RatingModel::TONES,
             ],
 
             'existing' => [
@@ -121,16 +138,14 @@ class SetupWizardController extends Controller
 
     /**
      * Step 2 — the org structure: the suggested departments that were ticked,
-     * plus any the owner typed.
+     * plus the ones the company described itself.
      */
     public function departments(WizardDepartmentsRequest $request): RedirectResponse
     {
-        $created = BlueprintInstaller::departments($request->validated('codes'));
-
-        foreach ($request->validated('custom') as $row) {
-            Department::create(['name' => $row['name'], 'code' => $row['code']]);
-            $created++;
-        }
+        $created = SetupInstaller::departments(SetupDefinition::departments(
+            $request->validated('codes'),
+            $request->validated('custom'),
+        ));
 
         ActivityLogger::log(
             event: 'created',
@@ -145,11 +160,16 @@ class SetupWizardController extends Controller
     }
 
     /**
-     * Step 3 — the kinds of leave the company grants, with their entitlements.
+     * Step 3 — the kinds of leave the company grants, with the entitlement and
+     * policy each carries.
      */
     public function leaveTypes(WizardLeaveTypesRequest $request): RedirectResponse
     {
-        $created = BlueprintInstaller::leaveTypes($request->validated('codes'), $request->days());
+        $created = SetupInstaller::leaveTypes(SetupDefinition::leaveTypes(
+            $request->validated('codes'),
+            $request->days(),
+            $request->validated('custom'),
+        ));
 
         ActivityLogger::log(
             event: 'created',
@@ -164,13 +184,12 @@ class SetupWizardController extends Controller
     }
 
     /**
-     * Step 4 — the hiring process job postings will run on.
+     * Step 4 — the hiring process job postings will run on: one of the shapes on
+     * offer, or the stages the company drew for itself.
      */
     public function recruitment(WizardRecruitmentRequest $request): RedirectResponse
     {
-        $blueprint = SetupBlueprints::find(SetupBlueprints::pipelines(), $request->validated('blueprint'));
-
-        $pipeline = BlueprintInstaller::pipeline($blueprint, $request->validated('name'));
+        $pipeline = SetupInstaller::pipeline(SetupDefinition::pipeline($request->validated()));
 
         ActivityLogger::log(
             event: 'created',
@@ -184,14 +203,13 @@ class SetupWizardController extends Controller
     }
 
     /**
-     * Step 5 — the appraisal framework, together with the instruments and
-     * catalogue criteria it measures on.
+     * Step 5 — the appraisal framework, together with the instruments and the
+     * criteria catalogue it measures on. Adopted whole, or designed here section
+     * by section; either way the framework editor reads it back unchanged.
      */
     public function performance(WizardPerformanceRequest $request): RedirectResponse
     {
-        $blueprint = SetupBlueprints::find(SetupBlueprints::frameworks(), $request->validated('blueprint'));
-
-        $template = BlueprintInstaller::framework($blueprint, $request->validated('name'));
+        $template = SetupInstaller::framework(SetupDefinition::framework($request->validated()));
 
         ActivityLogger::log(
             event: 'created',
@@ -265,6 +283,10 @@ class SetupWizardController extends Controller
      * measures — the client shows a framework's actual contents rather than a
      * count, and the criteria catalogue stays defined in exactly one place.
      *
+     * The criterion's own key rides along, so a company that opens a blueprint
+     * up to change it starts from lines that are still catalogue-backed rather
+     * than from copies of their wording.
+     *
      * @return list<array<string, mixed>>
      */
     private function frameworkBlueprints(): array
@@ -273,6 +295,7 @@ class SetupWizardController extends Controller
 
         return array_map(function (array $framework) use ($catalogue): array {
             $framework['items'] = array_map(fn (array $item): array => [
+                'criterion' => $item['criterion'],
                 'section' => $item['section'],
                 'weight' => $item['weight'],
                 'name' => $catalogue[$item['criterion']]['name'],
@@ -282,6 +305,24 @@ class SetupWizardController extends Controller
 
             return $framework;
         }, SetupBlueprints::frameworks());
+    }
+
+    /**
+     * The criteria catalogue as a list the client can offer, each entry keyed by
+     * what the server will resolve it back to. A company designing its own
+     * framework picks from these — the same "a criterion is chosen, not typed"
+     * rule the framework editor works by — and writes its own only where nothing
+     * here says what it means to do the job well.
+     *
+     * @return list<array{key: string, name: string, description: string, weight: float, scale: string}>
+     */
+    private function criteriaCatalogue(): array
+    {
+        return array_values(array_map(
+            fn (string $key, array $criterion): array => ['key' => $key] + $criterion,
+            array_keys(SetupBlueprints::criteria()),
+            SetupBlueprints::criteria(),
+        ));
     }
 
     /**

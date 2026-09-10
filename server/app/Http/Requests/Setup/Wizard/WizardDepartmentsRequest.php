@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Setup\Wizard;
 
+use App\Http\Requests\Setup\DepartmentRequest;
 use App\Models\Department;
 use App\Support\Setup\SetupBlueprints;
 use App\Support\Tenancy;
@@ -12,9 +13,12 @@ use Illuminate\Validation\Validator;
 
 /**
  * The wizard's org-structure step: the suggested departments the owner ticked,
- * plus any they typed for themselves. Suggestions are sent as blueprint codes
- * and resolved server-side (see {@see SetupBlueprints}), so the wording of a
- * suggested department is never something the client gets to decide.
+ * plus any they described for themselves. A suggestion is sent as a blueprint
+ * code and resolved server-side (see {@see SetupBlueprints}), so its wording is
+ * never something the client gets to decide; a department the company wrote —
+ * including a suggestion it customised, which arrives as one of these — carries
+ * its own name, code and description, validated exactly as
+ * {@see DepartmentRequest} would.
  */
 class WizardDepartmentsRequest extends FormRequest
 {
@@ -36,6 +40,7 @@ class WizardDepartmentsRequest extends FormRequest
             'custom' => ['present', 'array', 'max:20'],
             'custom.*.name' => ['required', 'string', 'max:255'],
             'custom.*.code' => ['required', 'string', 'max:50', $unique],
+            'custom.*.description' => ['nullable', 'string', 'max:2000'],
         ];
     }
 
@@ -106,11 +111,14 @@ class WizardDepartmentsRequest extends FormRequest
 
             $code = strtoupper(trim((string) ($row['code'] ?? '')));
 
+            $description = trim((string) ($row['description'] ?? ''));
+
             $custom[] = [
                 'name' => $name,
                 // An empty code is derivable rather than an error: the name is
                 // what the owner meant, the code is bookkeeping.
                 'code' => $code !== '' ? $code : Str::upper(Str::limit(Str::slug($name, ''), 8, '')),
+                'description' => $description !== '' ? $description : null,
             ];
         }
 
