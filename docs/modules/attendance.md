@@ -27,17 +27,26 @@ Everything is tenant-scoped (ADR 0005).
     overtime, attendance-rate %) with an inline worked-hours **sparkline**.
 
   Opening any record reveals the **day-detail modal** — centred, like every other detail
-  surface in the app. It is laid out in three fixed regions rather than one long column:
-  the header states who and when (person, status, date, the shift that applied), a
-  **totals band** under it (worked / break / late / overtime) stays put while the body
-  scrolls, and the body splits the **audit trail** (the punch timeline — time, source,
-  GPS pin) from the **evidence**: a verification rail holding the selfie captured at each
-  punch, the remarks, and the sign-off. The selfies are what make a mobile punch
-  checkable, so the rail shows them large enough to recognise a face rather than as the
-  40px thumbnails they used to be; a photo that no longer resolves says so instead of
-  rendering broken. HR actions (correct, approve, delete) sit in a pinned footer.
+  surface in the app, and read top to bottom in the order somebody checks a day: the
+  header states who and when (person, status, date, the shift that applied, and whether
+  the day was entered by hand), a **totals band** under it (worked / break / late /
+  overtime) stays put while the body scrolls, and the body carries the **punch trail**
+  followed by the remarks and the sign-off.
+
+  Each punch is one row — time, source, GPS pin, note — with **the photo taken at it on
+  that row**, large enough to recognise a face and opening full-size in a new tab. A
+  punch with no photo still gets a tile, saying which of three things happened: the
+  source never takes one (a web, kiosk or biometric punch), the mobile app was expected
+  to and did not, or the file has since gone. "No evidence" and "evidence missing" are
+  different findings, and an empty space states neither. The section header counts them
+  ("4 punches · 2 with a photo"), and the remarks and approval blocks are likewise always
+  drawn — an unwritten remark says so rather than leaving a gap. HR actions (correct,
+  approve, delete) sit in a pinned footer.
+
   **Recording or correcting a day** opens its own centred modal, with the four punches on
-  one row in the order they happen.
+  one row in the order they happen and a running read-out of what they add up to
+  ("8h 30m worked after a 45m break") — lateness and overtime stay the server's, since
+  they need the employee's schedule.
 - **`/attendance/me`** — employee **self-service**: a live **clock card** whose primary
   button flips with the day's state (Clock in → Start break → End break → Clock out),
   capturing geolocation (and an optional selfie) on each punch; plus today's punch

@@ -1,4 +1,4 @@
-import { BadgeCheck, ImageOff, Pencil, Trash2 } from 'lucide-react';
+import { BadgeCheck, CircleDashed, Pencil, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import {
     Modal,
@@ -6,14 +6,13 @@ import {
     ModalContent,
     ModalFooter,
     ModalHeader,
-    ModalSection,
 } from '@/components/modal';
 import { PersonAvatar } from '@/components/person-avatar';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { formatDuration, formatTime, PUNCH_META } from '../constants';
+import { formatDuration } from '../constants';
 import { attendanceRoutes } from '../routes';
-import type { AttendanceRecord, Punch } from '../types';
+import type { AttendanceRecord } from '../types';
 import { AttendanceStatusBadge } from './attendance-status-badge';
 import { PunchTimeline } from './punch-timeline';
 
@@ -30,14 +29,15 @@ type Props = {
 /**
  * One employee's day, opened in the middle of the screen.
  *
- * The day's shape is carried by three fixed regions rather than one long column:
- * the header states who and when, a totals band under it stays put while the body
- * scrolls, and the body splits the audit trail (the punch timeline) from the
- * evidence (the selfies captured at each punch, the remarks, the sign-off).
+ * The day reads top to bottom in the order somebody checks it: **who and when**
+ * in the header, **what it added up to** in a totals strip that stays put, then
+ * **the trail** — every punch with the photo taken at it — and finally anything
+ * written about the day.
  *
- * The selfies are the point of the record — they are what makes a mobile punch
- * checkable — so they are shown at a size a face can actually be recognised in,
- * rather than as the 40px thumbnails the timeline used to float beside each row.
+ * The trail carries its own evidence rather than a column beside it. A separate
+ * verification rail meant a day with no photos left half the modal empty, and a
+ * day with photos said each punch twice; putting the photo on its own row says
+ * it once, and lets a punch that has none say so.
  */
 export function RecordDetailDialog({
     record,
@@ -54,7 +54,7 @@ export function RecordDetailDialog({
 
     return (
         <Modal open={open} onOpenChange={onOpenChange}>
-            <ModalContent size="xl">
+            <ModalContent size="lg">
                 <Body
                     key={`${record.hashid ?? record.employee?.id}-${record.work_date}`}
                     record={record}
@@ -84,7 +84,7 @@ function Body({
     const employee = record.employee;
     const [detail, setDetail] = useState<AttendanceRecord>(record);
 
-    // Enrich with the full punch timeline the board list doesn't carry. A
+    // Enrich with the full punch trail the board list doesn't carry. A
     // transient roster row (no hashid) has nothing to fetch — the keyed remount
     // already seeds `detail` from the record.
     useEffect(() => {
@@ -112,24 +112,21 @@ function Body({
     }, [record]);
 
     const punches = detail.punches ?? [];
-    const shots = punches.filter((punch) => punch.photo);
+    const withPhoto = punches.filter((punch) => punch.photo).length;
     const hasRecord = Boolean(record.hashid);
     const needsApproval = detail.approval_status === 'pending';
     const approval = detail.approval_status;
 
-    // The rail only earns its column when it has something to hold.
-    const hasAside =
-        shots.length > 0 || Boolean(detail.remarks) || Boolean(approval);
-
     return (
         <>
             <ModalHeader
+                className="py-3.5"
                 icon={
                     <PersonAvatar
                         name={employee?.full_name ?? 'Unknown employee'}
                         initials={employee?.initials ?? '?'}
                         photo={employee?.photo}
-                        className="size-11 shrink-0"
+                        className="size-10 shrink-0"
                         fallbackClassName="text-sm"
                     />
                 }
@@ -148,19 +145,23 @@ function Body({
                         <span className="text-xs text-muted-foreground">
                             {formatDate(record.work_date)}
                         </span>
-                        {record.scheduled_start && record.scheduled_end && (
-                            <span className="text-xs text-muted-foreground">
-                                Shift {record.scheduled_start}–
-                                {record.scheduled_end}
+                        <span className="text-xs text-muted-foreground">
+                            {record.scheduled_start && record.scheduled_end
+                                ? `Shift ${record.scheduled_start}–${record.scheduled_end}`
+                                : 'No shift scheduled'}
+                        </span>
+                        {record.is_manual && (
+                            <span className="rounded bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground">
+                                Recorded by hand
                             </span>
                         )}
                     </>
                 }
             />
 
-            {/* The day's totals. Outside the scrolling body, so they stay in
-                view while a long timeline is read. */}
-            <dl className="flex shrink-0 divide-x divide-border border-b border-border px-5 py-3 sm:px-6">
+            {/* What the day added up to. Outside the scrolling body, so it stays
+                in view while a long trail is read. */}
+            <dl className="grid shrink-0 grid-cols-2 gap-y-2 border-b border-border px-5 py-2.5 sm:flex sm:gap-y-0 sm:divide-x sm:divide-border sm:px-6">
                 <Total
                     label="Worked"
                     value={formatDuration(detail.worked_minutes)}
@@ -189,51 +190,49 @@ function Body({
                 />
             </dl>
 
-            <ModalBody
-                className={cn(
-                    hasAside &&
-                        'lg:grid lg:grid-cols-[minmax(0,1fr)_17rem] lg:items-start lg:gap-x-6',
-                )}
-            >
-                <ModalSection title="Punch timeline">
-                    {/* The selfies move to the rail when it is shown, so a row
-                        here stays a single line of time, source and place. */}
-                    <PunchTimeline punches={punches} withPhotos={!hasAside} />
-                </ModalSection>
+            <ModalBody className="space-y-4 py-4">
+                <section className="space-y-2">
+                    <div className="flex items-baseline justify-between gap-3">
+                        <h3 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+                            Punch trail
+                        </h3>
+                        <p className="text-[11px] text-muted-foreground tabular-nums">
+                            {punches.length === 0
+                                ? 'Nothing recorded'
+                                : `${punches.length} ${punches.length === 1 ? 'punch' : 'punches'} · ${withPhoto} with a photo`}
+                        </p>
+                    </div>
 
-                {hasAside && (
-                    <aside className="mt-6 space-y-5 lg:mt-0">
-                        {shots.length > 0 && (
-                            <ModalSection
-                                title="Verification"
-                                hint="Captured by the employee at each punch"
-                            >
-                                <ul className="grid grid-cols-2 gap-2.5">
-                                    {shots.map((punch) => (
-                                        <Shot key={punch.id} punch={punch} />
-                                    ))}
-                                </ul>
-                            </ModalSection>
-                        )}
+                    <PunchTimeline punches={punches} />
+                </section>
 
-                        {detail.remarks && (
-                            <ModalSection title="Remarks">
-                                <p className="rounded-lg bg-muted/50 px-3 py-2 text-sm whitespace-pre-wrap">
-                                    {detail.remarks}
-                                </p>
-                            </ModalSection>
-                        )}
+                <section className="grid gap-3 sm:grid-cols-2">
+                    <Note label="Remarks" value={detail.remarks}>
+                        Nothing was written about this day.
+                    </Note>
 
-                        {approval && (
-                            <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                                <BadgeCheck className="size-3.5 shrink-0" />
-                                {approval === 'approved'
-                                    ? `Approved${detail.approver ? ` by ${detail.approver}` : ''}`
-                                    : `Approval ${approval}`}
-                            </p>
-                        )}
-                    </aside>
-                )}
+                    <Note
+                        label="Approval"
+                        value={
+                            approval === 'approved'
+                                ? `Approved${detail.approver ? ` by ${detail.approver}` : ''}`
+                                : approval === 'pending'
+                                  ? 'Waiting for a manager to approve it'
+                                  : approval === 'rejected'
+                                    ? 'Rejected'
+                                    : null
+                        }
+                        icon={
+                            approval === 'approved' ? (
+                                <BadgeCheck className="size-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                            ) : approval ? (
+                                <CircleDashed className="size-3.5 shrink-0 text-amber-600 dark:text-amber-400" />
+                            ) : undefined
+                        }
+                    >
+                        This day needs no sign-off.
+                    </Note>
+                </section>
             </ModalBody>
 
             {canManage && (
@@ -276,7 +275,7 @@ function Body({
     );
 }
 
-/** One figure in the totals band. */
+/** One figure in the totals strip. */
 function Total({
     label,
     value,
@@ -287,16 +286,11 @@ function Total({
     tone?: string;
 }) {
     return (
-        <div className="min-w-0 flex-1 px-4 first:pl-0 last:pr-0">
+        <div className="min-w-0 sm:flex-1 sm:px-4 sm:first:pl-0 sm:last:pr-0">
             <dt className="truncate text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
                 {label}
             </dt>
-            <dd
-                className={cn(
-                    'mt-0.5 text-sm font-semibold tabular-nums',
-                    tone,
-                )}
-            >
+            <dd className={cn('text-sm font-semibold tabular-nums', tone)}>
                 {value}
             </dd>
         </div>
@@ -304,56 +298,37 @@ function Total({
 }
 
 /**
- * A verification selfie, captioned by the punch it belongs to. A photo that no
- * longer resolves falls back to a labelled tile — a broken-image icon with its
- * alt text spilling across the rail is worse than saying so plainly.
+ * Something written about the day — or the plain statement that nothing was.
+ * Both blocks are always drawn: an empty half of a row reads as a layout that
+ * broke, where "nothing was written about this day" reads as a finding.
  */
-function Shot({ punch }: { punch: Punch }) {
-    const meta = PUNCH_META[punch.type];
-    const [broken, setBroken] = useState(false);
-
-    const caption = (
-        <p className="mt-1 truncate text-[11px] text-muted-foreground">
-            {meta.label}
-            <span className="ml-1 tabular-nums">
-                {formatTime(punch.punched_at)}
-            </span>
-        </p>
-    );
-
-    if (broken) {
-        return (
-            <li>
-                <div
-                    className="flex aspect-square w-full flex-col items-center justify-center gap-1 rounded-lg bg-muted/50 text-muted-foreground ring-1 ring-border"
-                    title="This photo is no longer available"
-                >
-                    <ImageOff className="size-5" />
-                    <span className="text-[10px]">Unavailable</span>
-                </div>
-                {caption}
-            </li>
-        );
-    }
-
+function Note({
+    label,
+    value,
+    icon,
+    children,
+}: {
+    label: string;
+    value: string | null;
+    icon?: React.ReactNode;
+    children: React.ReactNode;
+}) {
     return (
-        <li>
-            <a
-                href={punch.photo ?? undefined}
-                target="_blank"
-                rel="noreferrer"
-                className="group block overflow-hidden rounded-lg ring-1 ring-border focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-            >
-                <img
-                    src={punch.photo ?? undefined}
-                    alt={`${meta.label} selfie`}
-                    loading="lazy"
-                    onError={() => setBroken(true)}
-                    className="aspect-square w-full bg-muted/50 object-cover transition-opacity group-hover:opacity-90"
-                />
-            </a>
-            {caption}
-        </li>
+        <div className="rounded-lg border border-border px-3 py-2">
+            <p className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+                {label}
+            </p>
+            {value ? (
+                <p className="mt-1 flex items-start gap-1.5 text-sm whitespace-pre-wrap">
+                    {icon}
+                    <span className="min-w-0">{value}</span>
+                </p>
+            ) : (
+                <p className="mt-1 text-sm text-muted-foreground/70">
+                    {children}
+                </p>
+            )}
+        </div>
     );
 }
 

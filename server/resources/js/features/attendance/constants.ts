@@ -1,6 +1,11 @@
 import { Coffee, LogIn, LogOut, Play } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import type { AttendanceRecord, AttendanceStatus, PunchType } from './types';
+import type {
+    AttendanceRecord,
+    AttendanceStatus,
+    PunchSource,
+    PunchType,
+} from './types';
 
 export const DEFAULT_STATUS = 'all';
 
@@ -123,6 +128,20 @@ type PunchMeta = {
     verb: string;
     icon: LucideIcon;
     accent: string;
+};
+
+/**
+ * Where a punch came from, in the words somebody checking a record would use.
+ * It is also the answer to "why is there no photo here" — only the mobile app
+ * captures one, so a web or biometric punch never having a selfie is normal
+ * rather than missing.
+ */
+export const SOURCE_LABELS: Record<PunchSource, string> = {
+    web: 'Web',
+    mobile: 'Mobile app',
+    kiosk: 'Kiosk',
+    biometric: 'Biometric',
+    manual: 'Entered by hand',
 };
 
 export const PUNCH_META: Record<PunchType, PunchMeta> = {

@@ -66,9 +66,20 @@ list). Balances are a **list with chips**, not a wide employee×type matrix.
 ## Frontend
 
 - `features/leave/` — the inbox and balances: types, routes, constants, the filters hook,
-  and components (stats, the status-tabbed toolbar, request row, **file-leave sheet**,
-  **review drawer** with the balance meter, balances toolbar/cards/**adjust sheet**, a
-  shared Requests/Balances nav, confirm dialog). Pages: `pages/leave/{index,balances}`.
+  and components (stats, the status-tabbed toolbar, request row, the **file-leave**,
+  **review-request** and **adjust-balance modals**, balances toolbar/cards, and a shared
+  Requests/Balances nav). Pages: `pages/leave/{index,balances}`.
+- All three open **centred**, on the shared `components/modal.tsx` shell the rest of the
+  app uses, and the module reuses the shared `components/confirm-dialog.tsx` rather than
+  carrying its own copy.
+- The **review modal** is laid out the way an approver reads a request: the person in the
+  header, the ask (type, dates, days charged) in a strip that stays in view, and the
+  **balance meter** as the body's first and largest thing — the only part of the decision
+  that is a number rather than a judgement. The reason and the review note are always
+  drawn, stating plainly when nothing was written, so the layout does not change shape
+  with how much anybody typed.
+- The **file-leave modal** pairs its four decisions two-up (who and what kind, from and
+  to) over a live estimate of the working days the request will actually charge.
 - `features/leave-types/` — the Company Setup catalogue: a **card** per type, a
   **form sheet** (colour picker + policy switches), confirm dialog. Page:
   `pages/setup/leave-types`.

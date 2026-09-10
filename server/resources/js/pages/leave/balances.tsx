@@ -1,7 +1,7 @@
 import { Head, router, usePage } from '@inertiajs/react';
 import { Users } from 'lucide-react';
 import { useMemo, useState } from 'react';
-import { AdjustBalanceSheet } from '@/features/leave/components/adjust-balance-sheet';
+import { AdjustBalanceDialog } from '@/features/leave/components/adjust-balance-dialog';
 import { BalanceToolbar } from '@/features/leave/components/balance-toolbar';
 import { EmployeeBalanceCard } from '@/features/leave/components/employee-balance-card';
 import { LeaveNav } from '@/features/leave/components/leave-nav';
@@ -106,7 +106,7 @@ export default function LeaveBalances() {
                 )}
             </div>
 
-            <AdjustBalanceSheet
+            <AdjustBalanceDialog
                 employee={adjustEmployee}
                 year={year}
                 open={adjustOpen}

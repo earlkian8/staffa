@@ -2,13 +2,13 @@ import { Head, router, usePage } from '@inertiajs/react';
 import { CalendarDays } from 'lucide-react';
 import { useState } from 'react';
 import type { ReactNode } from 'react';
-import { ConfirmDialog } from '@/features/leave/components/confirm-dialog';
-import { FileLeaveSheet } from '@/features/leave/components/file-leave-sheet';
+import { ConfirmDialog } from '@/components/confirm-dialog';
+import { FileLeaveDialog } from '@/features/leave/components/file-leave-dialog';
 import { LeaveNav } from '@/features/leave/components/leave-nav';
 import { LeaveRequestRow } from '@/features/leave/components/leave-request-row';
 import { LeaveStatsCards } from '@/features/leave/components/leave-stats';
 import { LeaveToolbar } from '@/features/leave/components/leave-toolbar';
-import { ReviewRequestSheet } from '@/features/leave/components/review-request-sheet';
+import { ReviewRequestDialog } from '@/features/leave/components/review-request-dialog';
 import { useLeaveFilters } from '@/features/leave/hooks/use-leave-filters';
 import { leaveRoutes } from '@/features/leave/routes';
 import type { LeaveIndexPageProps, LeaveRequest } from '@/features/leave/types';
@@ -160,7 +160,7 @@ export default function LeaveIndex() {
                 </div>
             </div>
 
-            <FileLeaveSheet
+            <FileLeaveDialog
                 request={fileRequest}
                 employees={options.employees}
                 types={options.types}
@@ -168,7 +168,7 @@ export default function LeaveIndex() {
                 onOpenChange={setFileOpen}
             />
 
-            <ReviewRequestSheet
+            <ReviewRequestDialog
                 request={reviewRequest}
                 canRequest={can.request}
                 canManage={can.manage}

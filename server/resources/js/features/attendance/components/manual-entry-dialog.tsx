@@ -56,6 +56,16 @@ const PUNCH_TO_FIELD: Record<PunchType, keyof Times> = {
     clock_out: 'time_out',
 };
 
+/** A work date in the words the rest of the module uses. */
+function formatDay(date: string): string {
+    return new Date(`${date}T00:00:00`).toLocaleDateString(undefined, {
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+    });
+}
+
 function localTime(iso: string | null): string {
     if (!iso) {
         return '';
@@ -199,12 +209,12 @@ function Body({
                 title={isEdit ? 'Correct attendance' : 'Record attendance'}
                 description={
                     lockedEmployee
-                        ? `${lockedEmployee.full_name}${record?.work_date ? ` · ${record.work_date}` : ''}`
-                        : 'Enter a day the clock missed. Blank times mark the day absent.'
+                        ? `${lockedEmployee.full_name}${record?.work_date ? ` · ${formatDay(record.work_date)}` : ''}`
+                        : 'Enter a day the clock missed.'
                 }
             />
 
-            <ModalBody className="space-y-5">
+            <ModalBody className="space-y-4 py-4">
                 {needsSubject && (
                     <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_11rem]">
                         <div className="space-y-1.5">
@@ -277,10 +287,7 @@ function Body({
                             onChange={(v) => setField('time_out', v)}
                         />
                     </div>
-                    <p className="text-xs text-muted-foreground">
-                        Worked hours, lateness and overtime are computed against
-                        the employee&apos;s schedule.
-                    </p>
+                    <Preview times={times} />
                 </div>
 
                 <div className="space-y-1.5">
@@ -312,6 +319,73 @@ function Body({
             </ModalFooter>
         </>
     );
+}
+
+/**
+ * What the four times add up to, before anything is saved.
+ *
+ * The form takes clock readings and the server turns them into a day, so the
+ * one thing it cannot show you is the thing you are actually recording. This
+ * does the same subtraction the record will: out minus in, less the break.
+ * Lateness and overtime stay the server's — they need the employee's schedule,
+ * which this form does not have.
+ */
+function Preview({ times }: { times: Times }) {
+    const worked = minutesBetween(times.time_in, times.time_out);
+    const brk = minutesBetween(times.break_start, times.break_end);
+    const net = worked === null ? null : Math.max(worked - (brk ?? 0), 0);
+
+    return (
+        <p className="rounded-lg bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
+            {net === null ? (
+                'Leave the times blank to mark the day absent. Lateness and overtime are worked out against the employee\u2019s schedule.'
+            ) : (
+                <>
+                    <span className="font-semibold text-foreground tabular-nums">
+                        {formatSpan(net)}
+                    </span>{' '}
+                    worked
+                    {brk ? (
+                        <>
+                            {' '}
+                            after a{' '}
+                            <span className="tabular-nums">
+                                {formatSpan(brk)}
+                            </span>{' '}
+                            break
+                        </>
+                    ) : null}
+                    . Lateness and overtime are worked out against the
+                    employee&apos;s schedule.
+                </>
+            )}
+        </p>
+    );
+}
+
+/** Minutes between two `HH:MM` readings, or null when the pair is unusable. */
+function minutesBetween(from: string, to: string): number | null {
+    if (!from || !to) {
+        return null;
+    }
+
+    const [fromH, fromM] = from.split(':').map(Number);
+    const [toH, toM] = to.split(':').map(Number);
+    const minutes = toH * 60 + toM - (fromH * 60 + fromM);
+
+    // A shift that ends before it starts ran past midnight.
+    return minutes < 0 ? minutes + 24 * 60 : minutes;
+}
+
+function formatSpan(minutes: number): string {
+    const hours = Math.floor(minutes / 60);
+    const rest = minutes % 60;
+
+    if (hours === 0) {
+        return `${rest}m`;
+    }
+
+    return rest === 0 ? `${hours}h` : `${hours}h ${rest}m`;
 }
 
 function TimeField({

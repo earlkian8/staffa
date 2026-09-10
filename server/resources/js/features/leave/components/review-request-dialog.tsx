@@ -1,21 +1,16 @@
 import { router } from '@inertiajs/react';
-import {
-    CalendarRange,
-    Check,
-    Pencil,
-    Trash2,
-    UserRound,
-    X,
-} from 'lucide-react';
+import { Check, Pencil, Trash2, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import {
+    Modal,
+    ModalBody,
+    ModalContent,
+    ModalFooter,
+    ModalHeader,
+} from '@/components/modal';
 import { PersonAvatar } from '@/components/person-avatar';
 import { Button } from '@/components/ui/button';
-import {
-    Sheet,
-    SheetContent,
-    SheetHeader,
-    SheetTitle,
-} from '@/components/ui/sheet';
+import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
 import { HALF_DAY_LABELS } from '../constants';
 import { leaveRoutes } from '../routes';
@@ -34,7 +29,19 @@ type Props = {
     onDelete: (request: LeaveRequest) => void;
 };
 
-export function ReviewRequestSheet({
+/**
+ * One leave request, opened in the middle of the screen.
+ *
+ * An approver reads it in one order — who is asking, for what and when, whether
+ * they have the days, and why — so that is the order it is laid out in: the
+ * person in the header, the ask in a strip that stays put beneath it, and the
+ * balance as the body's first and largest thing, because it is the only part of
+ * the decision that is a number rather than a judgement.
+ *
+ * Every block is drawn whether or not it has content. A request with no reason
+ * given is a fact worth stating; a gap where the reason would be is not.
+ */
+export function ReviewRequestDialog({
     request,
     canRequest,
     canManage,
@@ -45,11 +52,8 @@ export function ReviewRequestSheet({
     onDelete,
 }: Props) {
     return (
-        <Sheet open={open} onOpenChange={onOpenChange}>
-            <SheetContent
-                side="right"
-                className="w-full gap-0 overflow-y-auto p-0 sm:max-w-lg"
-            >
+        <Modal open={open} onOpenChange={onOpenChange}>
+            <ModalContent size="lg">
                 {request && (
                     <Body
                         key={request.id}
@@ -62,8 +66,8 @@ export function ReviewRequestSheet({
                         onDone={() => onOpenChange(false)}
                     />
                 )}
-            </SheetContent>
-        </Sheet>
+            </ModalContent>
+        </Modal>
     );
 }
 
@@ -126,77 +130,72 @@ function Body({
         );
     };
 
+    const duration = `${request.days} day${request.days === 1 ? '' : 's'}${
+        request.is_half_day && request.half_day_period
+            ? ` · ${HALF_DAY_LABELS[request.half_day_period]}`
+            : ''
+    }`;
+
     return (
-        <div className="flex h-full flex-col">
-            <SheetHeader className="border-b border-border px-6 py-4">
-                <div className="flex items-center gap-3">
+        <>
+            <ModalHeader
+                className="py-3.5"
+                icon={
                     <PersonAvatar
                         name={employee?.full_name ?? 'Unknown employee'}
                         initials={employee?.initials ?? '?'}
                         photo={employee?.photo}
-                        className="size-11"
+                        className="size-10 shrink-0"
                         fallbackClassName="text-sm"
                     />
-                    <div className="min-w-0 flex-1">
-                        <SheetTitle className="truncate text-base">
-                            {employee?.full_name ?? 'Unknown employee'}
-                        </SheetTitle>
-                        <p className="truncate text-xs text-muted-foreground">
-                            {employee?.position?.title ?? 'No position'}
-                            {employee?.department
-                                ? ` · ${employee.department.name}`
-                                : ''}
-                        </p>
-                    </div>
-                    <RequestStatusBadge status={request.status} />
-                </div>
-            </SheetHeader>
-
-            <div className="flex-1 space-y-6 px-6 py-6">
-                <div className="grid grid-cols-2 gap-3">
-                    <Meta label="Leave type">
-                        {request.type ? (
-                            <LeaveTypeChip
-                                name={request.type.name}
-                                color={request.type.color}
-                            />
-                        ) : (
-                            '—'
-                        )}
-                    </Meta>
-                    <Meta label="Duration">
-                        <span className="tabular-nums">
-                            {request.days} day{request.days === 1 ? '' : 's'}
-                        </span>
-                        {request.is_half_day && request.half_day_period
-                            ? ` · ${HALF_DAY_LABELS[request.half_day_period]}`
+                }
+                title={employee?.full_name ?? 'Unknown employee'}
+                description={
+                    <>
+                        {employee?.position?.title ?? 'No position'}
+                        {employee?.department
+                            ? ` · ${employee.department.name}`
                             : ''}
-                    </Meta>
-                    <Meta label="Dates" full>
-                        <span className="inline-flex items-center gap-1.5">
-                            <CalendarRange className="size-3.5 text-muted-foreground" />
-                            {formatRange(request)}
-                        </span>
-                    </Meta>
-                </div>
+                    </>
+                }
+                meta={<RequestStatusBadge status={request.status} />}
+            />
 
-                {request.reason && (
-                    <Block label="Reason">{request.reason}</Block>
-                )}
+            {/* The ask itself, outside the scrolling body so it stays in view
+                while the reason and the history are read. */}
+            <dl className="grid shrink-0 grid-cols-2 gap-x-4 gap-y-2 border-b border-border px-5 py-2.5 sm:flex sm:gap-y-0 sm:divide-x sm:divide-border sm:px-6">
+                <Fact label="Leave type">
+                    {request.type ? (
+                        <LeaveTypeChip
+                            name={request.type.name}
+                            color={request.type.color}
+                        />
+                    ) : (
+                        <span className="text-muted-foreground">Not set</span>
+                    )}
+                </Fact>
+                <Fact label="Dates" grow>
+                    {formatRange(request)}
+                </Fact>
+                <Fact label="Charged">
+                    <span className="tabular-nums">{duration}</span>
+                </Fact>
+            </dl>
 
-                {/* Balance impact for this type/year. */}
-                {balance && (
-                    <div className="rounded-xl border border-sidebar-border/70 p-4 dark:border-sidebar-border">
-                        <div className="mb-2 flex items-center justify-between text-sm">
-                            <span className="font-medium">
+            <ModalBody className="space-y-4 py-4">
+                {balance ? (
+                    <section className="rounded-lg border border-border px-3.5 py-3">
+                        <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+                            <p className="text-sm font-medium">
                                 {balance.name} balance
-                            </span>
-                            <span className="text-muted-foreground tabular-nums">
-                                {balance.remaining} of {balance.entitled} left
-                            </span>
+                            </p>
+                            <p className="text-xs text-muted-foreground tabular-nums">
+                                {balance.remaining} of {balance.entitled} days
+                                left
+                            </p>
                         </div>
                         <BalanceMeter balance={balance} />
-                        <div className="mt-2 flex items-center gap-3 text-[11px] text-muted-foreground">
+                        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
                             <Legend
                                 color="#0ABFBF"
                                 label={`${balance.used} used`}
@@ -210,53 +209,60 @@ function Body({
                                 label={`${Math.max(balance.remaining, 0)} left`}
                             />
                         </div>
-                    </div>
+                    </section>
+                ) : (
+                    <p className="rounded-lg border border-dashed border-border px-3.5 py-3 text-sm text-muted-foreground">
+                        No balance is tracked for this leave type, so this
+                        request is not charged against an entitlement.
+                    </p>
                 )}
 
-                {detail.review_note && (
-                    <Block label="Review note">{detail.review_note}</Block>
-                )}
-
-                <div className="space-y-1.5 text-xs text-muted-foreground">
-                    {detail.filer && (
-                        <p className="inline-flex items-center gap-1.5">
-                            <UserRound className="size-3.5" />
-                            Filed by {detail.filer}
-                            {request.created_human
-                                ? ` · ${request.created_human}`
-                                : ''}
-                        </p>
-                    )}
-                    {detail.reviewer && request.reviewed_at && (
-                        <p className="inline-flex items-center gap-1.5">
-                            <Check className="size-3.5" />
-                            Reviewed by {detail.reviewer} ·{' '}
-                            {formatDateTime(request.reviewed_at)}
-                        </p>
-                    )}
+                <div className="grid gap-3 sm:grid-cols-2">
+                    <Block label="Reason given" value={request.reason}>
+                        No reason was given.
+                    </Block>
+                    <Block label="Review note" value={detail.review_note}>
+                        {isPending
+                            ? 'Nothing yet — add one below.'
+                            : 'No note was left.'}
+                    </Block>
                 </div>
 
-                {/* Review note input — only when acting on a pending request. */}
+                <div className="space-y-1 text-xs text-muted-foreground">
+                    <p>
+                        {detail.filer ? `Filed by ${detail.filer}` : 'Filed'}
+                        {request.created_human
+                            ? ` · ${request.created_human}`
+                            : ''}
+                    </p>
+                    <p>
+                        {detail.reviewer && request.reviewed_at
+                            ? `Reviewed by ${detail.reviewer} · ${formatDateTime(request.reviewed_at)}`
+                            : 'Not reviewed yet.'}
+                    </p>
+                </div>
+
                 {isPending && canManage && (
-                    <div>
-                        <label className="mb-1.5 block text-sm font-medium">
-                            Review note{' '}
+                    <div className="space-y-1.5">
+                        <Label htmlFor="review-note">
+                            Add a note{' '}
                             <span className="font-normal text-muted-foreground">
-                                (optional)
+                                (optional — the employee sees it)
                             </span>
-                        </label>
+                        </Label>
                         <textarea
+                            id="review-note"
                             value={note}
                             onChange={(event) => setNote(event.target.value)}
                             rows={2}
-                            placeholder="Add a note for the employee…"
+                            placeholder="Why this is approved or turned down…"
                             className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30"
                         />
                     </div>
                 )}
-            </div>
+            </ModalBody>
 
-            <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border px-6 py-4">
+            <ModalFooter className="justify-between">
                 <div className="flex items-center gap-2">
                     {isPending && canRequest && (
                         <Button
@@ -322,7 +328,29 @@ function Body({
                         </Button>
                     </div>
                 )}
-            </div>
+            </ModalFooter>
+        </>
+    );
+}
+
+/** One term of the ask, in the strip under the header. */
+function Fact({
+    label,
+    grow = false,
+    children,
+}: {
+    label: string;
+    grow?: boolean;
+    children: React.ReactNode;
+}) {
+    return (
+        <div
+            className={`min-w-0 sm:px-4 sm:first:pl-0 sm:last:pr-0 ${grow ? 'sm:flex-1' : ''}`}
+        >
+            <dt className="truncate text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
+                {label}
+            </dt>
+            <dd className="truncate text-sm font-medium">{children}</dd>
         </div>
     );
 }
@@ -333,7 +361,7 @@ function BalanceMeter({ balance }: { balance: BalanceSnapshot }) {
     const pendingPct = (balance.pending / total) * 100;
 
     return (
-        <div className="flex h-2 w-full overflow-hidden rounded-full bg-muted">
+        <div className="mt-2 flex h-2 w-full overflow-hidden rounded-full bg-muted">
             <div
                 className="h-full bg-[#0ABFBF]"
                 style={{ width: `${usedPct}%` }}
@@ -358,44 +386,32 @@ function Legend({ color, label }: { color: string; label: string }) {
     );
 }
 
-function Meta({
-    label,
-    full = false,
-    children,
-}: {
-    label: string;
-    full?: boolean;
-    children: React.ReactNode;
-}) {
-    return (
-        <div
-            className={
-                full
-                    ? 'col-span-2 rounded-lg border border-sidebar-border/70 bg-card p-3 dark:border-sidebar-border'
-                    : 'rounded-lg border border-sidebar-border/70 bg-card p-3 dark:border-sidebar-border'
-            }
-        >
-            <p className="text-xs text-muted-foreground">{label}</p>
-            <div className="mt-1 text-sm font-medium">{children}</div>
-        </div>
-    );
-}
-
+/**
+ * Something written about the request — or the plain statement that nothing
+ * was. Both halves of the row are always drawn, so the layout does not change
+ * shape depending on how much anybody typed.
+ */
 function Block({
     label,
+    value,
     children,
 }: {
     label: string;
+    value: string | null | undefined;
     children: React.ReactNode;
 }) {
     return (
-        <div>
-            <p className="mb-1 text-xs font-medium text-muted-foreground">
+        <div className="rounded-lg border border-border px-3 py-2">
+            <p className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
                 {label}
             </p>
-            <p className="rounded-lg bg-muted/50 px-3 py-2 text-sm whitespace-pre-wrap">
-                {children}
-            </p>
+            {value ? (
+                <p className="mt-1 text-sm whitespace-pre-wrap">{value}</p>
+            ) : (
+                <p className="mt-1 text-sm text-muted-foreground/70">
+                    {children}
+                </p>
+            )}
         </div>
     );
 }
@@ -410,7 +426,6 @@ function formatRange(request: LeaveRequest): string {
             weekday: 'short',
             month: 'short',
             day: 'numeric',
-            year: 'numeric',
         });
 
     if (!request.end_date || request.start_date === request.end_date) {
