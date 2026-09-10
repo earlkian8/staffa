@@ -98,6 +98,20 @@ Company Setup → **Performance Framework**, four tabs:
   ladder the scorecard will show), and which reading the scorecard leads with.
   Full archive lifecycle; a framework used for appraisals cannot be permanently
   deleted.
+
+  A criterion is **chosen, not typed**. The editor offers the catalogue, and a
+  line that names one takes the catalogue's wording and meaning — at save, when
+  the editor reads it back, and when a scorecard is opened — so retitling a
+  criterion once reaches every framework drawing on it. The same criterion cannot
+  be measured twice in one framework. A line that is genuinely local to a
+  framework is written as an explicit **one-off** (`kpi_criterion_id` null): it
+  keeps its own words, stays out of the catalogue, and no other framework can
+  reuse it.
+
+  Weights are relative twice over — a section's share of the appraisal, a line's
+  share of its section — so the editor states each line's resulting share of the
+  whole, keeps a running total per section and across sections, and can split
+  either evenly.
 - **Rating scales** — the measurement instruments, one marked as the tenant's
   default. A scale still in use cannot be permanently deleted.
 - **Criteria** — the catalogue: name, meaning, scale, default weight.
