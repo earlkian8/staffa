@@ -48,6 +48,7 @@ const PAGES = [
     'analytics.attrition.index' => 'analytics/attrition',
 
     // Company Setup
+    'setup.wizard.show' => 'setup/wizard',
     'setup.company.edit' => 'setup/company',
     'setup.departments.index' => 'setup/departments',
     'setup.leave-types.index' => 'setup/leave-types',

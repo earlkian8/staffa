@@ -18,7 +18,14 @@ Soft-deletes.
 | `logo` | string, nullable | Stored on the `public` disk; exposed as `logo_url`. |
 | `email` / `phone` / `address` | string/text, nullable | |
 | `tin` / `sss_employer_no` / `philhealth_employer_no` / `pagibig_employer_no` | string, nullable | Employer government IDs. |
+| `join_code` / `join_code_enabled` | string / boolean | The code people type to ask to join (ADR 0026). A credential, so not `$fillable`. |
+| `setup_completed_at` | timestamp, nullable | Null means guided setup is still owed — see [ADR 0032](../decisions/0032-guided-company-setup.md). Organisations that predate the wizard were back-filled as complete. |
+| `setup_steps` | json, nullable | `{step key: "done"｜"skipped"}` for the wizard's five steps; anything absent reads as pending. |
 | timestamps + `deleted_at` | | |
+
+> `setup_completed_at` and `setup_steps` are **not** `$fillable`: like `join_code` they
+> are tenant state, written only by `Support\Setup\CompanySetup`, never by an edit to
+> the company profile.
 
 ## The `organization_id` column
 

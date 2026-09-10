@@ -7,11 +7,10 @@ use App\Http\Requests\Setup\UpdateCompanyProfileRequest;
 use App\Http\Resources\CompanyProfileResource;
 use App\Models\Organization;
 use App\Support\ActivityLogger;
+use App\Support\Setup\CompanyProfileWriter;
 use App\Support\Tenancy;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Arr;
-use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -42,22 +41,7 @@ class CompanyProfileController extends Controller
     {
         $organization = $this->organization();
 
-        // Logo: remove first (explicit), then a new upload supersedes the old file.
-        if ($request->boolean('remove_logo') && $organization->logo) {
-            Storage::disk('public')->delete($organization->logo);
-            $organization->logo = null;
-        }
-
-        if ($request->hasFile('logo')) {
-            if ($organization->logo) {
-                Storage::disk('public')->delete($organization->logo);
-            }
-
-            $organization->logo = $request->file('logo')->store('organization-logos', 'public');
-        }
-
-        $organization->fill(Arr::except($request->validated(), ['logo', 'remove_logo']));
-        $organization->save();
+        CompanyProfileWriter::apply($organization, $request->validated());
 
         ActivityLogger::log(
             event: 'updated',

@@ -7,6 +7,7 @@ use App\Models\Employee;
 use App\Models\Organization;
 use App\Models\Position;
 use App\Models\WorkSchedule;
+use App\Support\Setup\CompanySetup;
 use App\Support\Tenancy;
 use Illuminate\Database\Seeder;
 
@@ -33,6 +34,10 @@ class OrganizationSeeder extends Seeder
         // 0. Company profile — flesh out the tenant's own identity / statutory
         // details so the Company Profile screen isn't empty. Only when unset.
         $this->seedCompanyProfile($tenancy->organization());
+
+        // A seeded tenant is a company already in use, so it is past guided setup —
+        // signing in as the demo account lands on the dashboard, not the wizard.
+        CompanySetup::complete($tenancy->organization());
 
         // 1. Departments.
         $departments = collect([

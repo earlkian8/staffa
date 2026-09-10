@@ -2,6 +2,7 @@
 
 use App\Http\Middleware\HandleAppearance;
 use App\Http\Middleware\HandleInertiaRequests;
+use App\Http\Middleware\RequireCompanySetup;
 use App\Http\Middleware\SecurityHeaders;
 use App\Http\Middleware\SetCurrentOrganization;
 use Illuminate\Foundation\Application;
@@ -27,6 +28,9 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->web(append: [
             HandleAppearance::class,
             SetCurrentOrganization::class,
+            // Reads the tenant the line above bound, so it must follow it: a
+            // company that has never been set up sends its owner to the wizard.
+            RequireCompanySetup::class,
             HandleInertiaRequests::class,
             AddLinkHeadersForPreloadedAssets::class,
         ]);

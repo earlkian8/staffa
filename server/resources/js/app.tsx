@@ -24,6 +24,11 @@ createInertiaApp({
             // anywhere yet (ADR 0026) — it cannot assume the app shell.
             case name === 'invite':
                 return null;
+            // Company setup is pre-dashboard chrome: a brand-new company has
+            // nothing for the sidebar to link to yet, and the wizard carries its
+            // own rail. See RequireCompanySetup.
+            case name === 'setup/wizard':
+                return null;
             case name.startsWith('auth/'):
                 return AuthLayout;
             case name.startsWith('settings/'):

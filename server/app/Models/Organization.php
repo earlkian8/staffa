@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Models\Concerns\BelongsToOrganization;
 use App\Support\JoinCode;
+use App\Support\Setup\CompanySetup;
 use Database\Factories\OrganizationFactory;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -58,6 +59,9 @@ class Organization extends Model
     /**
      * `join_code` is deliberately absent from {@see $fillable}: it is a credential,
      * not a profile field, and only ever changes through {@see rotateJoinCode()}.
+     * The two `setup_*` columns are absent for the same reason — they are the
+     * tenant's own record of where it got to in guided setup, written only by
+     * {@see CompanySetup}, never by an edit to the profile.
      *
      * @return array<string, string>
      */
@@ -65,6 +69,8 @@ class Organization extends Model
     {
         return [
             'join_code_enabled' => 'boolean',
+            'setup_completed_at' => 'datetime',
+            'setup_steps' => 'array',
         ];
     }
 
@@ -143,6 +149,17 @@ class Organization extends Model
         $this->forceFill(['join_code' => $code])->save();
 
         return $code;
+    }
+
+    /**
+     * Whether this company has been through guided setup — either finishing the
+     * wizard or deciding it would configure things itself. Until it has, an owner
+     * signing in is taken to the wizard rather than an empty dashboard.
+     * See {@see CompanySetup}.
+     */
+    public function hasFinishedSetup(): bool
+    {
+        return $this->setup_completed_at !== null;
     }
 
     /**

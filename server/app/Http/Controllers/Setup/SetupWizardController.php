@@ -1,0 +1,286 @@
+<?php
+
+namespace App\Http\Controllers\Setup;
+
+use App\Http\Controllers\Controller;
+use App\Http\Middleware\RequireCompanySetup;
+use App\Http\Requests\Setup\UpdateCompanyProfileRequest;
+use App\Http\Requests\Setup\Wizard\WizardDepartmentsRequest;
+use App\Http\Requests\Setup\Wizard\WizardLeaveTypesRequest;
+use App\Http\Requests\Setup\Wizard\WizardPerformanceRequest;
+use App\Http\Requests\Setup\Wizard\WizardRecruitmentRequest;
+use App\Http\Requests\Setup\Wizard\WizardSkipRequest;
+use App\Http\Resources\CompanyProfileResource;
+use App\Models\Department;
+use App\Models\LeaveType;
+use App\Models\Organization;
+use App\Models\RecruitmentPipeline;
+use App\Models\ReviewTemplate;
+use App\Support\ActivityLogger;
+use App\Support\Setup\BlueprintInstaller;
+use App\Support\Setup\CompanyProfileWriter;
+use App\Support\Setup\CompanySetup;
+use App\Support\Setup\SetupBlueprints;
+use App\Support\Tenancy;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Inertia\Inertia;
+use Inertia\Response;
+
+/**
+ * The guided setup a brand-new company is taken through before its dashboard.
+ *
+ * Registration provisions an empty tenant (ADR 0005), and the modules that read
+ * configuration ship no defaults on purpose — so the owner's first sign-in used
+ * to land on a dashboard of zeroes with nine Company Setup screens behind it and
+ * nothing saying which mattered. This walks the five that block day-one work:
+ * the company's own identity, its org structure, the leave it grants, how it
+ * hires, and how it appraises.
+ *
+ * Three rules hold across every step:
+ *
+ *  - **Every step can be skipped**, and a skip is recorded rather than forgotten,
+ *    so the wizard resumes past it instead of asking twice.
+ *  - **Nothing here is a hidden default.** A step writes only what the owner
+ *    picked, from {@see SetupBlueprints}; leaving the wizard without touching it
+ *    leaves the company exactly as empty as it was.
+ *  - **Steps configure real modules**, so each is gated by that module's own
+ *    permission ({@see CompanySetup::ABILITIES}) — the wizard is a route through
+ *    Company Setup, not a way around it. A step the signed-in user may not do is
+ *    shown as unavailable rather than hidden, so they know what is outstanding.
+ *
+ * {@see RequireCompanySetup} is what brings an owner here; finishing (or skipping
+ * outright) is what lets them past it.
+ */
+class SetupWizardController extends Controller
+{
+    public function __construct(private readonly Tenancy $tenancy) {}
+
+    /**
+     * The wizard itself. Carries the blueprints each step chooses from, what the
+     * company already has, and where it got to last time.
+     */
+    public function show(Request $request): Response
+    {
+        $organization = $this->organization();
+        $user = $request->user();
+
+        return Inertia::render('setup/wizard', [
+            'company' => (new CompanyProfileResource($organization))->resolve($request),
+
+            'progress' => [
+                'steps' => CompanySetup::statuses($organization),
+                'resume' => CompanySetup::resumeStep($organization),
+                'completed' => $organization->hasFinishedSetup(),
+            ],
+
+            // What each step can offer, and what the company already has — a step
+            // whose module is already configured says so instead of pretending
+            // this is the company's first day.
+            'blueprints' => [
+                'departments' => SetupBlueprints::departments(),
+                'leaveTypes' => SetupBlueprints::leaveTypes(),
+                'pipelines' => SetupBlueprints::pipelines(),
+                'frameworks' => $this->frameworkBlueprints(),
+            ],
+
+            'existing' => [
+                'departments' => Department::query()->orderBy('name')->pluck('name')->all(),
+                'leaveTypes' => LeaveType::query()->orderBy('name')->pluck('name')->all(),
+                'pipelines' => RecruitmentPipeline::query()->orderBy('name')->pluck('name')->all(),
+                'frameworks' => ReviewTemplate::query()->orderBy('name')->pluck('name')->all(),
+            ],
+
+            // Per-step, because the five steps are five different permissions.
+            'can' => collect(CompanySetup::ABILITIES)
+                ->map(fn (string $ability): bool => $user->can($ability))
+                ->all(),
+        ]);
+    }
+
+    /**
+     * Step 1 — the company's own identity, contact details and statutory numbers.
+     * Same payload, same validation and same writer as the Company Profile screen.
+     */
+    public function company(UpdateCompanyProfileRequest $request): RedirectResponse
+    {
+        $organization = $this->organization();
+
+        CompanyProfileWriter::apply($organization, $request->validated());
+
+        ActivityLogger::log(
+            event: 'updated',
+            description: 'Set up the company profile',
+            subject: $organization,
+            logName: 'company-setup',
+            subjectLabel: $organization->name,
+        );
+
+        return $this->completed(CompanySetup::COMPANY);
+    }
+
+    /**
+     * Step 2 — the org structure: the suggested departments that were ticked,
+     * plus any the owner typed.
+     */
+    public function departments(WizardDepartmentsRequest $request): RedirectResponse
+    {
+        $created = BlueprintInstaller::departments($request->validated('codes'));
+
+        foreach ($request->validated('custom') as $row) {
+            Department::create(['name' => $row['name'], 'code' => $row['code']]);
+            $created++;
+        }
+
+        ActivityLogger::log(
+            event: 'created',
+            description: "Set up {$created} ".str('department')->plural($created).' during company setup',
+            logName: 'company-setup',
+        );
+
+        return $this->completed(CompanySetup::DEPARTMENTS);
+    }
+
+    /**
+     * Step 3 — the kinds of leave the company grants, with their entitlements.
+     */
+    public function leaveTypes(WizardLeaveTypesRequest $request): RedirectResponse
+    {
+        $created = BlueprintInstaller::leaveTypes($request->validated('codes'), $request->days());
+
+        ActivityLogger::log(
+            event: 'created',
+            description: "Set up {$created} leave ".str('type')->plural($created).' during company setup',
+            logName: 'company-setup',
+        );
+
+        return $this->completed(CompanySetup::LEAVE_TYPES);
+    }
+
+    /**
+     * Step 4 — the hiring process job postings will run on.
+     */
+    public function recruitment(WizardRecruitmentRequest $request): RedirectResponse
+    {
+        $blueprint = SetupBlueprints::find(SetupBlueprints::pipelines(), $request->validated('blueprint'));
+
+        $pipeline = BlueprintInstaller::pipeline($blueprint, $request->validated('name'));
+
+        ActivityLogger::log(
+            event: 'created',
+            description: "Created recruitment pipeline \"{$pipeline->name}\" during company setup",
+            subject: $pipeline,
+            logName: 'recruitment',
+            subjectLabel: $pipeline->name,
+        );
+
+        return $this->completed(CompanySetup::RECRUITMENT);
+    }
+
+    /**
+     * Step 5 — the appraisal framework, together with the instruments and
+     * catalogue criteria it measures on.
+     */
+    public function performance(WizardPerformanceRequest $request): RedirectResponse
+    {
+        $blueprint = SetupBlueprints::find(SetupBlueprints::frameworks(), $request->validated('blueprint'));
+
+        $template = BlueprintInstaller::framework($blueprint, $request->validated('name'));
+
+        ActivityLogger::log(
+            event: 'created',
+            description: "Created appraisal framework \"{$template->name}\" during company setup",
+            subject: $template,
+            logName: 'company-setup',
+            subjectLabel: $template->name,
+        );
+
+        return $this->completed(CompanySetup::PERFORMANCE);
+    }
+
+    /**
+     * Pass over one step. Recorded, so the wizard resumes past it — and so the
+     * finish screen can say honestly what was left for later.
+     */
+    public function skip(WizardSkipRequest $request): RedirectResponse
+    {
+        CompanySetup::markStep($this->organization(), $request->validated('step'), CompanySetup::SKIPPED);
+
+        return back();
+    }
+
+    /**
+     * Close setup and go to the dashboard. Reached from the finish screen and
+     * from "I'll do this later" on the way in — either way the company stops
+     * being sent here, and every Company Setup screen stays exactly where it was.
+     */
+    public function finish(): RedirectResponse
+    {
+        $organization = $this->organization();
+
+        if (! $organization->hasFinishedSetup()) {
+            CompanySetup::complete($organization);
+
+            ActivityLogger::log(
+                event: 'updated',
+                description: 'Finished company setup',
+                subject: $organization,
+                logName: 'company-setup',
+                subjectLabel: $organization->name,
+            );
+        }
+
+        Inertia::flash('toast', ['type' => 'success', 'message' => "{$organization->name} is ready to go."]);
+
+        return redirect()->route('dashboard');
+    }
+
+    /**
+     * Record a finished step and stay on the wizard, so the client decides what
+     * to show next.
+     *
+     * Deliberately silent. Everywhere else in the app a save is confirmed by a
+     * toast, because nothing else on screen changes; here the wizard advances,
+     * the rung ticks and the progress bar moves the moment the server says yes —
+     * a toast on top of that is noise, and it lands on the button the owner is
+     * about to press next.
+     */
+    private function completed(string $step): RedirectResponse
+    {
+        CompanySetup::markStep($this->organization(), $step, CompanySetup::DONE);
+
+        return back();
+    }
+
+    /**
+     * The appraisal blueprints with each line resolved to the criterion it
+     * measures — the client shows a framework's actual contents rather than a
+     * count, and the criteria catalogue stays defined in exactly one place.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function frameworkBlueprints(): array
+    {
+        $catalogue = SetupBlueprints::criteria();
+
+        return array_map(function (array $framework) use ($catalogue): array {
+            $framework['items'] = array_map(fn (array $item): array => [
+                'section' => $item['section'],
+                'weight' => $item['weight'],
+                'name' => $catalogue[$item['criterion']]['name'],
+                'description' => $catalogue[$item['criterion']]['description'],
+                'scale' => $catalogue[$item['criterion']]['scale'],
+            ], $framework['items']);
+
+            return $framework;
+        }, SetupBlueprints::frameworks());
+    }
+
+    /**
+     * The current tenant — the company being set up.
+     */
+    private function organization(): Organization
+    {
+        return $this->tenancy->organization() ?? request()->user()?->defaultOrganization() ?? abort(403);
+    }
+}

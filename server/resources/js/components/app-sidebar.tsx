@@ -10,6 +10,7 @@ import {
     CalendarDays,
     CalendarRange,
     ClipboardList,
+    Compass,
     DatabaseBackup,
     Gauge,
     GraduationCap,
@@ -164,6 +165,15 @@ const analyticsNavItems: GatedNavItem[] = [
 ];
 
 const companySetupNavItems: GatedNavItem[] = [
+    {
+        // The guided walk-through a new company is taken through before its
+        // dashboard. It stays listed afterwards so a step that was skipped on
+        // day one can be picked up later.
+        title: 'Setup Guide',
+        href: '/setup/wizard',
+        icon: Compass,
+        permission: 'setup.company.manage',
+    },
     {
         title: 'Company Profile',
         href: '/setup/company',

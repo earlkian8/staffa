@@ -1,0 +1,339 @@
+<?php
+
+namespace App\Support\Setup;
+
+use App\Support\Performance\RatingScales;
+
+/**
+ * The starting points the setup wizard offers — the departments, kinds of leave,
+ * hiring processes and appraisal frameworks a company can adopt in one click
+ * instead of designing from nothing on its first day.
+ *
+ * These are **starting points, not defaults**: nothing here is applied unless the
+ * owner picks it, which keeps this codebase's "no module defaults, honest empty
+ * state" convention intact (see the pipelines back-fill migration). Everything a
+ * step can create is described here rather than in the client, so what the wizard
+ * offers and what the server is willing to write are the same list — a posted
+ * blueprint key is resolved against it, never trusted as content.
+ *
+ * The performance blueprints draw their instruments from
+ * {@see RatingScales::library()}, so a company that starts here measures on the
+ * same scales it would have built by hand.
+ */
+class SetupBlueprints
+{
+    /**
+     * The functions almost every company has. Codes match the ones the demo
+     * tenant seeds, so a company that adopts these reads the same as the sample
+     * data people are shown.
+     *
+     * @return list<array{code: string, name: string, description: string}>
+     */
+    public static function departments(): array
+    {
+        return [
+            ['code' => 'HR', 'name' => 'Human Resources', 'description' => 'Hiring, records, benefits and employee relations.'],
+            ['code' => 'FIN', 'name' => 'Finance', 'description' => 'Accounting, payroll, budgeting and statutory remittances.'],
+            ['code' => 'OPS', 'name' => 'Operations', 'description' => 'The work the business is paid for, and the people who deliver it.'],
+            ['code' => 'IT', 'name' => 'Information Technology', 'description' => 'Systems, equipment, access and support.'],
+            ['code' => 'SAL', 'name' => 'Sales & Marketing', 'description' => 'Winning customers and keeping them.'],
+            ['code' => 'ADM', 'name' => 'Administration', 'description' => 'Facilities, procurement and general office support.'],
+        ];
+    }
+
+    /**
+     * The kinds of leave a Philippine employer normally grants. The statutory
+     * ones (maternity, paternity, solo parent) carry the entitlements the law
+     * sets; the rest carry a common company allowance the owner can change.
+     *
+     * `recommended` is what the wizard pre-ticks — the set almost everyone needs
+     * from day one — not a claim about what an employer is obliged to offer.
+     *
+     * @return list<array{code: string, name: string, description: string, color: string, default_days: float, is_paid: bool, allow_half_day: bool, requires_approval: bool, recommended: bool}>
+     */
+    public static function leaveTypes(): array
+    {
+        return [
+            [
+                'code' => 'VL', 'name' => 'Vacation Leave',
+                'description' => 'Planned time off, filed ahead of the date.',
+                'color' => '#0ABFBF', 'default_days' => 15,
+                'is_paid' => true, 'allow_half_day' => true, 'requires_approval' => true,
+                'recommended' => true,
+            ],
+            [
+                'code' => 'SL', 'name' => 'Sick Leave',
+                'description' => 'Illness or injury, filed on or after the day it happens.',
+                'color' => '#F59E0B', 'default_days' => 15,
+                'is_paid' => true, 'allow_half_day' => true, 'requires_approval' => true,
+                'recommended' => true,
+            ],
+            [
+                'code' => 'EL', 'name' => 'Emergency Leave',
+                'description' => 'Urgent personal matters that cannot wait for approval.',
+                'color' => '#EF4444', 'default_days' => 3,
+                'is_paid' => true, 'allow_half_day' => true, 'requires_approval' => true,
+                'recommended' => true,
+            ],
+            [
+                'code' => 'BL', 'name' => 'Bereavement Leave',
+                'description' => 'The death of an immediate family member.',
+                'color' => '#64748B', 'default_days' => 3,
+                'is_paid' => true, 'allow_half_day' => false, 'requires_approval' => true,
+                'recommended' => true,
+            ],
+            [
+                'code' => 'ML', 'name' => 'Maternity Leave',
+                'description' => '105 days under RA 11210, with 15 more for a solo parent.',
+                'color' => '#EC4899', 'default_days' => 105,
+                'is_paid' => true, 'allow_half_day' => false, 'requires_approval' => true,
+                'recommended' => true,
+            ],
+            [
+                'code' => 'PL', 'name' => 'Paternity Leave',
+                'description' => '7 days for a married male employee under RA 8187.',
+                'color' => '#6366F1', 'default_days' => 7,
+                'is_paid' => true, 'allow_half_day' => false, 'requires_approval' => true,
+                'recommended' => true,
+            ],
+            [
+                'code' => 'SPL', 'name' => 'Solo Parent Leave',
+                'description' => '7 days for a qualified solo parent under RA 8972.',
+                'color' => '#8B5CF6', 'default_days' => 7,
+                'is_paid' => true, 'allow_half_day' => false, 'requires_approval' => true,
+                'recommended' => false,
+            ],
+            [
+                'code' => 'SIL', 'name' => 'Service Incentive Leave',
+                'description' => 'The 5 days the Labor Code grants after a year of service.',
+                'color' => '#10B981', 'default_days' => 5,
+                'is_paid' => true, 'allow_half_day' => true, 'requires_approval' => true,
+                'recommended' => false,
+            ],
+            [
+                'code' => 'UL', 'name' => 'Unpaid Leave',
+                'description' => 'Time off beyond an allowance, taken without pay.',
+                'color' => '#94A3B8', 'default_days' => 0,
+                'is_paid' => false, 'allow_half_day' => true, 'requires_approval' => true,
+                'recommended' => false,
+            ],
+        ];
+    }
+
+    /**
+     * Hiring processes to start from. A stage's `kind` is what recruitment keys
+     * off (ADR 0029), so these differ in shape rather than only in wording.
+     *
+     * @return list<array{key: string, name: string, description: string, stages: list<array{name: string, kind: string}>}>
+     */
+    public static function pipelines(): array
+    {
+        return [
+            [
+                'key' => 'standard',
+                'name' => 'Standard Hiring',
+                'description' => 'Screen, interview, offer. The process most roles are hired through.',
+                'stages' => [
+                    ['name' => 'Applied', 'kind' => 'open'],
+                    ['name' => 'Screening', 'kind' => 'open'],
+                    ['name' => 'Interview', 'kind' => 'open'],
+                    ['name' => 'Offer', 'kind' => 'open'],
+                    ['name' => 'Hired', 'kind' => 'won'],
+                    ['name' => 'Rejected', 'kind' => 'lost'],
+                ],
+            ],
+            [
+                'key' => 'fast-track',
+                'name' => 'Fast Track',
+                'description' => 'One conversation and a decision — for volume and frontline roles.',
+                'stages' => [
+                    ['name' => 'Applied', 'kind' => 'open'],
+                    ['name' => 'Interview', 'kind' => 'open'],
+                    ['name' => 'Hired', 'kind' => 'won'],
+                    ['name' => 'Not proceeding', 'kind' => 'lost'],
+                ],
+            ],
+            [
+                'key' => 'executive',
+                'name' => 'Executive Search',
+                'description' => 'Sourced candidates, a panel, and a longer road to an offer.',
+                'stages' => [
+                    ['name' => 'Sourced', 'kind' => 'open'],
+                    ['name' => 'Screening', 'kind' => 'open'],
+                    ['name' => 'First interview', 'kind' => 'open'],
+                    ['name' => 'Panel interview', 'kind' => 'open'],
+                    ['name' => 'Final interview', 'kind' => 'open'],
+                    ['name' => 'Offer', 'kind' => 'open'],
+                    ['name' => 'Hired', 'kind' => 'won'],
+                    ['name' => 'Rejected', 'kind' => 'lost'],
+                    ['name' => 'Withdrew', 'kind' => 'lost'],
+                ],
+            ],
+        ];
+    }
+
+    /**
+     * The criteria catalogue the performance blueprints draw from — the tenant's
+     * shared vocabulary for what gets measured. A framework puts a criterion in a
+     * section at a weight; `weight` here is the catalogue's own default, which a
+     * framework may override (see ADR 0028).
+     *
+     * Keyed so a framework names a criterion rather than repeating it, which is
+     * also what stops two frameworks from creating two "Communication"s.
+     *
+     * @return array<string, array{name: string, description: string, weight: float, scale: string}>
+     */
+    public static function criteria(): array
+    {
+        return [
+            'goal_attainment' => [
+                'name' => 'Goal attainment',
+                'description' => 'How much of what was agreed for the period was actually delivered.',
+                'weight' => 30, 'scale' => 'Goal attainment (%)',
+            ],
+            'quality_of_work' => [
+                'name' => 'Quality of work',
+                'description' => 'Accuracy, thoroughness and how much rework the output needs.',
+                'weight' => 20, 'scale' => '5-point rating',
+            ],
+            'productivity' => [
+                'name' => 'Productivity',
+                'description' => 'Volume of work carried, and whether it lands when it is due.',
+                'weight' => 20, 'scale' => '5-point rating',
+            ],
+            'job_knowledge' => [
+                'name' => 'Job knowledge',
+                'description' => 'Command of the skills, tools and rules the role runs on.',
+                'weight' => 15, 'scale' => 'Competency level',
+            ],
+            'problem_solving' => [
+                'name' => 'Problem solving',
+                'description' => 'Working out what is wrong and deciding what to do about it.',
+                'weight' => 15, 'scale' => 'Competency level',
+            ],
+            'communication' => [
+                'name' => 'Communication',
+                'description' => 'Being clear and timely in writing, in person and across teams.',
+                'weight' => 15, 'scale' => 'Competency level',
+            ],
+            'teamwork' => [
+                'name' => 'Teamwork & collaboration',
+                'description' => 'Working with others, and leaving them better off for it.',
+                'weight' => 15, 'scale' => 'Expectation rating',
+            ],
+            'dependability' => [
+                'name' => 'Dependability',
+                'description' => 'Attendance, punctuality, and following through on commitments.',
+                'weight' => 15, 'scale' => 'Expectation rating',
+            ],
+        ];
+    }
+
+    /**
+     * Appraisal frameworks to start from. Each names the sections it divides the
+     * appraisal into, and the catalogue criteria each section measures — at a
+     * weight *within that section* (`weight`), which is how the framework editor
+     * reads them back.
+     *
+     * Applying one creates only the scales and criteria it actually uses, so a
+     * new tenant's catalogue is the framework it chose rather than everything
+     * this class knows about.
+     *
+     * @return list<array{key: string, name: string, description: string, scale: string, result_display: string, sections: list<array{key: string, name: string, description: string, weight: float}>, items: list<array{criterion: string, section: string, weight: float}>}>
+     */
+    public static function frameworks(): array
+    {
+        return [
+            [
+                'key' => 'balanced',
+                'name' => 'Balanced Appraisal',
+                'description' => 'What was achieved, the skill it was achieved with, and how the person worked while doing it.',
+                'scale' => '5-point rating',
+                'result_display' => 'band',
+                'sections' => [
+                    ['key' => 'goals', 'name' => 'Goals & results', 'description' => 'What the period was supposed to produce.', 'weight' => 50],
+                    ['key' => 'competencies', 'name' => 'Competencies', 'description' => 'The capability the work was done with.', 'weight' => 30],
+                    ['key' => 'conduct', 'name' => 'Values & conduct', 'description' => 'How the person worked with everyone else.', 'weight' => 20],
+                ],
+                'items' => [
+                    ['criterion' => 'goal_attainment', 'section' => 'goals', 'weight' => 60],
+                    ['criterion' => 'quality_of_work', 'section' => 'goals', 'weight' => 40],
+                    ['criterion' => 'job_knowledge', 'section' => 'competencies', 'weight' => 40],
+                    ['criterion' => 'problem_solving', 'section' => 'competencies', 'weight' => 30],
+                    ['criterion' => 'communication', 'section' => 'competencies', 'weight' => 30],
+                    ['criterion' => 'teamwork', 'section' => 'conduct', 'weight' => 50],
+                    ['criterion' => 'dependability', 'section' => 'conduct', 'weight' => 50],
+                ],
+            ],
+            [
+                'key' => 'competency',
+                'name' => 'Competency Review',
+                'description' => 'Where each person sits on the capability ladder, for companies that promote on skill.',
+                'scale' => 'Competency level',
+                'result_display' => 'band',
+                'sections' => [
+                    ['key' => 'core', 'name' => 'Core competencies', 'description' => 'What every role in the company is expected to have.', 'weight' => 60],
+                    ['key' => 'delivery', 'name' => 'Delivery', 'description' => 'The work itself, at the standard of the role.', 'weight' => 40],
+                ],
+                'items' => [
+                    ['criterion' => 'job_knowledge', 'section' => 'core', 'weight' => 35],
+                    ['criterion' => 'communication', 'section' => 'core', 'weight' => 35],
+                    ['criterion' => 'dependability', 'section' => 'core', 'weight' => 30],
+                    ['criterion' => 'quality_of_work', 'section' => 'delivery', 'weight' => 50],
+                    ['criterion' => 'productivity', 'section' => 'delivery', 'weight' => 50],
+                ],
+            ],
+            [
+                'key' => 'results',
+                'name' => 'Results & Conduct',
+                'description' => 'Two questions only — was it delivered, and was it delivered well. The shortest review that still says something.',
+                'scale' => 'Expectation rating',
+                'result_display' => 'percent',
+                'sections' => [
+                    ['key' => 'delivered', 'name' => 'What was delivered', 'description' => 'Against what was agreed for the period.', 'weight' => 70],
+                    ['key' => 'how', 'name' => 'How it was delivered', 'description' => 'The way the person worked to get there.', 'weight' => 30],
+                ],
+                'items' => [
+                    ['criterion' => 'goal_attainment', 'section' => 'delivered', 'weight' => 100],
+                    ['criterion' => 'teamwork', 'section' => 'how', 'weight' => 50],
+                    ['criterion' => 'dependability', 'section' => 'how', 'weight' => 50],
+                ],
+            ],
+        ];
+    }
+
+    /**
+     * One blueprint out of a list, resolved by its `key`, or null when nothing
+     * carries that key. The wizard resolves every posted key through here so a
+     * client can only ever choose from this file.
+     *
+     * @param  list<array<string, mixed>>  $blueprints
+     * @return array<string, mixed>|null
+     */
+    public static function find(array $blueprints, ?string $key): ?array
+    {
+        foreach ($blueprints as $blueprint) {
+            if (($blueprint['key'] ?? null) === $key) {
+                return $blueprint;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * The rating scale a blueprint names, out of {@see RatingScales::library()}.
+     *
+     * @return array<string, mixed>|null
+     */
+    public static function scale(string $name): ?array
+    {
+        foreach (RatingScales::library() as $scale) {
+            if ($scale['name'] === $name) {
+                return $scale;
+            }
+        }
+
+        return null;
+    }
+}
