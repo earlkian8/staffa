@@ -1,7 +1,7 @@
 <?php
 
 use App\Models\User;
-use Illuminate\Auth\Notifications\VerifyEmail;
+use App\Notifications\VerifyEmailCodeNotification;
 use Illuminate\Support\Facades\Notification;
 use Laravel\Fortify\Features;
 
@@ -18,7 +18,8 @@ test('sends verification notification', function () {
         ->post(route('verification.send'))
         ->assertRedirect(route('home'));
 
-    Notification::assertSentTo($user, VerifyEmail::class);
+    // The address is confirmed by a code now, not a signed link (ADR 0033).
+    Notification::assertSentTo($user, VerifyEmailCodeNotification::class);
 });
 
 test('does not send verification notification if email is verified', function () {

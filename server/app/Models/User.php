@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Notifications\VerifyEmailCodeNotification;
+use App\Support\EmailVerificationCode;
 use App\Support\Tenancy;
 use Database\Factories\UserFactory;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
@@ -39,7 +41,7 @@ use NotificationChannels\WebPush\HasPushSubscriptions;
     'last_login_at',
     'password_changed_at',
 ])]
-#[Hidden(['password', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token'])]
+#[Hidden(['password', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token', 'email_verification_code'])]
 class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
 {
     /** @use HasFactory<UserFactory> */
@@ -283,12 +285,27 @@ class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
      *
      * @return array<string, string>
      */
+    /**
+     * Send the "confirm your address" mail.
+     *
+     * Overrides the framework's link-based notification: this app verifies with a
+     * one-time code rather than a signed URL, so a fresh code is issued here and
+     * carried by {@see VerifyEmailCodeNotification}. Both ways an address gets
+     * confirmed — the `Registered` listener at sign-up and Fortify's resend
+     * endpoint — call this one method, so neither can drift from the other.
+     */
+    public function sendEmailVerificationNotification(): void
+    {
+        $this->notify(new VerifyEmailCodeNotification(EmailVerificationCode::issueFor($this)));
+    }
+
     protected function casts(): array
     {
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'two_factor_confirmed_at' => 'datetime',
+            'email_verification_code_expires_at' => 'datetime',
             'is_active' => 'boolean',
             'email_notifications' => 'boolean',
             'push_notifications' => 'boolean',

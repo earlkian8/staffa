@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AssistantController;
 use App\Http\Controllers\AssistantConversationController;
+use App\Http\Controllers\Auth\VerifyEmailCodeController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\OrganizationSwitchController;
 use App\Http\Controllers\Public\InvitationController;
@@ -21,6 +22,15 @@ Route::get('invite/{token}', [InvitationController::class, 'show'])
 // Only `auth` — switching must work regardless of the new org's verification state.
 Route::middleware('auth')->post('organization/switch', [OrganizationSwitchController::class, 'update'])
     ->name('organization.switch');
+
+// Confirming an email address from the code it was sent. Fortify owns the screen
+// (`verification.notice`) and the resend (`verification.send`); this is the third
+// leg, which its link-based flow had no need of. Only `auth` — the caller is by
+// definition not verified yet. Throttled because a six-digit code is only safe
+// while guessing it is slow.
+Route::middleware(['auth', 'throttle:6,1'])
+    ->post('email/verify', [VerifyEmailCodeController::class, 'store'])
+    ->name('verification.code');
 
 Route::middleware(['auth', 'verified'])->group(function () {
     // The post-login landing: pick which company to work in (skipped for users

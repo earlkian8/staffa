@@ -15,6 +15,8 @@ See [ADR 0001](../decisions/0001-user-identity-and-management.md) for the ration
 | `suffix` | string | yes | e.g. Jr., Sr., III. |
 | `email` | string | no | Unique. |
 | `email_verified_at` | timestamp | yes | Set when the email is verified. |
+| `email_verification_code` | string | yes | **Hashed** one-time code the address is confirmed with ([ADR 0033](../decisions/0033-email-verification-by-code.md)). Not fillable, `#[Hidden]`, cleared once spent. |
+| `email_verification_code_expires_at` | timestamp | yes | When that code stops working (`auth.verification.code_expire`, 10 minutes). |
 | `password` | string | yes | **Nullable** — supports invited / SSO-provisioned accounts. Hashed via cast. |
 | `phone_number` | string | yes | |
 | `profile_photo` | string | yes | Path / URL to avatar. |

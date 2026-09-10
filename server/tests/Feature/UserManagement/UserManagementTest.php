@@ -2,8 +2,8 @@
 
 use App\Models\Organization;
 use App\Models\User;
+use App\Notifications\VerifyEmailCodeNotification;
 use App\Support\Tenancy;
-use Illuminate\Auth\Notifications\VerifyEmail;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Notification;
@@ -151,7 +151,7 @@ test('an identity that already works elsewhere is linked in, not duplicated', fu
         ->and($person->fresh()->isMemberOf($elsewhere))->toBeTrue();
 });
 
-test('it creates new users unverified and emails a confirmation link', function () {
+test('it creates new users unverified and emails a confirmation code', function () {
     $this->post(route('system.users.store'), [
         'first_name' => 'Veri',
         'last_name' => 'Fied',
@@ -162,7 +162,7 @@ test('it creates new users unverified and emails a confirmation link', function 
     $user = User::where('email', 'veri.fied@example.com')->first();
 
     expect($user->email_verified_at)->toBeNull();
-    Notification::assertSentTo($user, VerifyEmail::class);
+    Notification::assertSentTo($user, VerifyEmailCodeNotification::class);
 });
 
 test('it stores an uploaded profile photo', function () {
@@ -197,7 +197,7 @@ test('it updates a user', function () {
     expect($user->fresh()->first_name)->toBe('Updated');
 });
 
-test('changing a user email resets verification and resends the link', function () {
+test('changing a user email resets verification and sends a new code', function () {
     $user = User::factory()->create(); // verified by default
 
     $this->patch(route('system.users.update', $user), [
@@ -211,7 +211,7 @@ test('changing a user email resets verification and resends the link', function 
 
     expect($fresh->email)->toBe('changed.address@example.com')
         ->and($fresh->email_verified_at)->toBeNull();
-    Notification::assertSentTo($fresh, VerifyEmail::class);
+    Notification::assertSentTo($fresh, VerifyEmailCodeNotification::class);
 });
 
 test('updating a user without changing the email keeps verification', function () {
@@ -228,13 +228,13 @@ test('updating a user without changing the email keeps verification', function (
     Notification::assertNothingSent();
 });
 
-test('it resends the verification link to an unverified user', function () {
+test('it sends a fresh verification code to an unverified user', function () {
     $user = User::factory()->unverified()->create();
 
     $this->post(route('system.users.resend-verification', $user))
         ->assertSessionHasNoErrors();
 
-    Notification::assertSentTo($user, VerifyEmail::class);
+    Notification::assertSentTo($user, VerifyEmailCodeNotification::class);
 });
 
 test('it will not resend verification to an already-verified user', function () {
