@@ -39,6 +39,11 @@ function declarations**; the *why* is in
 The model only *decides*; the module *enforces* (permission, validation, tenancy,
 activity log, notifications), reusing the same code the controllers do.
 
+A turn *about* a new hire is answered from a **retrieved brief** this module contributes
+to before the model is called — which programme they are on, how much of the checklist is
+behind them, and what is overdue by name
+([ADR 0035](../decisions/0035-assistant-answers-from-a-retrieved-brief.md)).
+
 | Group | Tools |
 | --- | --- |
 | Cases | `find_onboarding_cases` (employee / status / department / **overdue** / due window), `start_onboarding`, `update_onboarding_case` (target date, notes), `set_onboarding_status`, `delete_onboarding_case` |

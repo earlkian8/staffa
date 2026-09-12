@@ -8,6 +8,10 @@ use App\Models\Employee;
 use App\Models\LeaveRequest;
 use App\Models\LeaveType;
 use App\Models\User;
+use App\Queries\LeaveBalanceService;
+use App\Services\Assistant\Contracts\ContributesContext;
+use App\Services\Assistant\Retrieval\ContextSection;
+use App\Services\Assistant\Retrieval\RetrievedSubject;
 use App\Services\Assistant\ToolResult;
 use App\Support\ActivityLogger;
 use App\Support\HolidayCalendar;
@@ -21,7 +25,7 @@ use Illuminate\Support\Facades\Validator;
  * requests. Chargeable days are always computed server-side (never trusted from
  * the model), mirroring {@see LeaveRequestController}.
  */
-class LeaveModule extends Module
+class LeaveModule extends Module implements ContributesContext
 {
     public function key(): string
     {
@@ -31,6 +35,76 @@ class LeaveModule extends Module
     public function isAvailable(User $user): bool
     {
         return $user->can('leave.view');
+    }
+
+    /** How many recent requests a read-out lists before it stops. */
+    private const CONTEXT_REQUESTS = 5;
+
+    /**
+     * What this person is entitled to, what they have spent, and what they have
+     * asked for lately.
+     *
+     * Entitlements come from {@see LeaveBalanceService}, which is the only place
+     * that knows a balance is an allocation minus derived usage rather than a
+     * stored number — so a figure quoted in chat is the same figure the balances
+     * screen shows, down to the rounding.
+     */
+    public function contextFor(User $user, RetrievedSubject $subject): ?ContextSection
+    {
+        $employee = $subject->employeeModel();
+
+        if ($employee === null || $user->cannot('leave.view')) {
+            return null;
+        }
+
+        $year = (int) Carbon::today()->year;
+
+        $types = LeaveType::where('is_active', true)->orderBy('name')->get();
+        $balances = $types->isEmpty()
+            ? []
+            : (app(LeaveBalanceService::class)->forEmployees(collect([$employee]), $types, $year)[$employee->id] ?? []);
+
+        // Only the types that mean something for this person: an untouched
+        // entitlement of zero is noise in a briefing.
+        $used = array_values(array_filter(
+            $balances,
+            fn (array $row): bool => $row['used'] > 0 || $row['pending'] > 0 || $row['entitled'] > 0,
+        ));
+
+        $requests = LeaveRequest::query()
+            ->where('employee_id', $employee->id)
+            ->with('type:id,name')
+            ->orderByDesc('start_date')
+            ->limit(self::CONTEXT_REQUESTS)
+            ->get();
+
+        if ($used === [] && $requests->isEmpty()) {
+            return null;
+        }
+
+        $pending = $requests->where('status', 'pending')->count();
+
+        return ContextSection::of('Leave ('.$year.')', [
+            $used !== []
+                ? 'Balances — '.implode('; ', array_map(
+                    fn (array $row): string => $row['name'].': '.$row['remaining'].' of '.$row['entitled'].' days left'.
+                        ($row['pending'] > 0 ? ', '.$row['pending'].' pending' : ''),
+                    $used,
+                ))
+                : 'No entitlements are allocated for this year.',
+            $requests->isNotEmpty()
+                ? 'Recent requests — '.$requests->map(fn (LeaveRequest $r): string => sprintf(
+                    '%s %s%s (%s day%s, %s)',
+                    $r->type?->name ?? 'Leave',
+                    $r->start_date?->toDateString() ?? '?',
+                    $r->end_date && ! $r->end_date->isSameDay($r->start_date) ? ' to '.$r->end_date->toDateString() : '',
+                    rtrim(rtrim((string) $r->days, '0'), '.'),
+                    (float) $r->days === 1.0 ? '' : 's',
+                    $r->status,
+                ))->implode('; ')
+                : 'No leave has been filed.',
+            $pending > 0 ? $pending.' request'.($pending === 1 ? '' : 's').' waiting for a decision' : null,
+        ]);
     }
 
     protected function toolMap(): array

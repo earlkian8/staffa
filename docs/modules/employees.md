@@ -189,12 +189,21 @@ through `App\Support\EmployeeInvitations` and `App\Support\WorkspaceJoin`.
 
 ---
 
-## 5b. The agentic assistant (ADR 0027)
+## 5b. The agentic assistant (ADR 0027, ADR 0035)
 
 `App\Services\Assistant\Modules\EmployeeModule` is how the assistant answers
-questions about the workforce. **Retrieval is function calling over live,
-tenant-scoped, permission-checked queries — not an embedding index**; the *why*
-is in [ADR 0027](../decisions/0027-assistant-employee-retrieval-and-disclosure-policy.md).
+questions about the workforce. **Retrieval is live, tenant-scoped,
+permission-checked queries — not an embedding index**; the *why* is in
+[ADR 0027](../decisions/0027-assistant-employee-retrieval-and-disclosure-policy.md).
+
+It reaches the model two ways. A turn that is **about somebody** is answered from a
+**retrieved brief** assembled before the model is called at all — this module's slice of
+it is the same `EmployeeDisclosure::profile()` projection `get_employee_profile`
+returns, alongside whatever Attendance, Leave, Onboarding and Recruitment contribute
+about the same person ([ADR 0035](../decisions/0035-assistant-answers-from-a-retrieved-brief.md)).
+Everything else still goes through the tools below. Both paths apply the same deny-list
+and the same permission checks, and both write the same `viewed` audit entry when a
+named individual is read.
 
 **Nine tools**, each filtered from the offer *and* re-checked at execution:
 

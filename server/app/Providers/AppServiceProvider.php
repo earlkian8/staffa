@@ -9,6 +9,8 @@ use App\Services\Assistant\Modules\EmployeeModule;
 use App\Services\Assistant\Modules\LeaveModule;
 use App\Services\Assistant\Modules\OnboardingModule;
 use App\Services\Assistant\Modules\RecruitmentModule;
+use App\Services\Assistant\Retrieval\Retriever;
+use App\Services\Assistant\Retrieval\SubjectResolver;
 use App\Support\Ai\GeminiClient;
 use App\Support\Ml\MlClient;
 use App\Support\PermissionRegistry;
@@ -50,15 +52,25 @@ class AppServiceProvider extends ServiceProvider
 
         // The agentic assistant and the HR modules it can act on. Each module is
         // permission-gated per user at runtime; register them all here.
+        // One module list, read twice: the assistant asks each module what it can
+        // *do*, the retriever asks each what it *knows*.
+        $this->app->singleton('assistant.modules', fn ($app): array => [
+            $app->make(EmployeeModule::class),
+            $app->make(LeaveModule::class),
+            $app->make(AttendanceModule::class),
+            $app->make(OnboardingModule::class),
+            $app->make(RecruitmentModule::class),
+        ]);
+
+        $this->app->singleton(Retriever::class, fn ($app): Retriever => new Retriever(
+            $app->make(SubjectResolver::class),
+            $app->make('assistant.modules'),
+        ));
+
         $this->app->singleton(Assistant::class, fn ($app): Assistant => new Assistant(
             $app->make(GeminiClient::class),
-            [
-                $app->make(EmployeeModule::class),
-                $app->make(LeaveModule::class),
-                $app->make(AttendanceModule::class),
-                $app->make(OnboardingModule::class),
-                $app->make(RecruitmentModule::class),
-            ],
+            $app->make('assistant.modules'),
+            $app->make(Retriever::class),
         ));
     }
 

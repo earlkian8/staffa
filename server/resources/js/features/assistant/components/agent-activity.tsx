@@ -4,6 +4,7 @@ import {
     BadgeCheck,
     Ban,
     BellRing,
+    BookOpen,
     CalendarClock,
     Check,
     CheckCircle2,
@@ -105,6 +106,7 @@ export function AgentActivity({
                         >
                             <StepIcon
                                 status={step.status}
+                                kind={step.kind}
                                 isLast={
                                     index === visibleSteps - 1 &&
                                     revealed < total
@@ -133,7 +135,15 @@ export function AgentActivity({
     );
 }
 
-function StepIcon({ status, isLast }: { status: string; isLast: boolean }) {
+function StepIcon({
+    status,
+    kind,
+    isLast,
+}: {
+    status: string;
+    kind?: AgentStep['kind'];
+    isLast: boolean;
+}) {
     if (isLast && status === 'done') {
         return (
             <Loader2 className="mt-px size-3.5 shrink-0 animate-spin text-[#0ABFBF]" />
@@ -144,6 +154,16 @@ function StepIcon({ status, isLast }: { status: string; isLast: boolean }) {
         return (
             <span className="mt-px flex size-3.5 shrink-0 items-center justify-center rounded-full bg-destructive/15">
                 <X className="size-2.5 text-destructive" />
+            </span>
+        );
+    }
+
+    // A read is the record being consulted, not a change to it — the difference
+    // between "here's what I found" and "here's what I did".
+    if (kind === 'read') {
+        return (
+            <span className="mt-px flex size-3.5 shrink-0 items-center justify-center rounded-full bg-[#0ABFBF]/15">
+                <BookOpen className="size-2.5 text-[#0a8b91] dark:text-[#0ABFBF]" />
             </span>
         );
     }

@@ -11,6 +11,9 @@ use App\Models\OnboardingProgram;
 use App\Models\OnboardingTask;
 use App\Models\User;
 use App\Queries\OnboardingStatistics;
+use App\Services\Assistant\Contracts\ContributesContext;
+use App\Services\Assistant\Retrieval\ContextSection;
+use App\Services\Assistant\Retrieval\RetrievedSubject;
 use App\Services\Assistant\ToolResult;
 use App\Support\ActivityLogger;
 use App\Support\OnboardingProvisioner;
@@ -39,7 +42,7 @@ use Illuminate\Support\Facades\Validator;
  * Tools are advertised only to users whose permissions allow them, and each
  * handler re-checks anyway.
  */
-class OnboardingModule extends Module
+class OnboardingModule extends Module implements ContributesContext
 {
     /** How many records a find_* tool returns at most. */
     private const FIND_LIMIT = 8;
@@ -57,6 +60,64 @@ class OnboardingModule extends Module
     public function isAvailable(User $user): bool
     {
         return $user->can('onboarding.view');
+    }
+
+    /**
+     * Where this person is in joining the company: the programme they are on,
+     * how much of the checklist is behind them, and what is late.
+     *
+     * Onboarding is the part of a new hire's record that answers "are they
+     * settled in yet", which is most of what "how are they doing" means in
+     * their first month — so overdue work is named rather than counted.
+     */
+    public function contextFor(User $user, RetrievedSubject $subject): ?ContextSection
+    {
+        $employee = $subject->employeeModel();
+
+        if ($employee === null || $user->cannot('onboarding.view')) {
+            return null;
+        }
+
+        $case = OnboardingCase::query()
+            ->where('employee_id', $employee->id)
+            ->with(['program:id,name', 'tasks'])
+            ->orderByDesc('start_date')
+            ->first();
+
+        if ($case === null) {
+            return null;
+        }
+
+        $tasks = $case->tasks;
+        $resolved = $tasks->whereIn('status', OnboardingTask::RESOLVED_STATUSES);
+        $outstanding = $tasks->whereNotIn('status', OnboardingTask::RESOLVED_STATUSES);
+        $today = Carbon::today();
+
+        $overdue = $outstanding->filter(
+            fn (OnboardingTask $task): bool => $task->due_date !== null && $task->due_date->lt($today),
+        );
+
+        $next = $outstanding
+            ->filter(fn (OnboardingTask $task): bool => $task->due_date !== null)
+            ->sortBy('due_date')
+            ->first();
+
+        return ContextSection::of('Onboarding', [
+            'Case status: '.str_replace('_', ' ', (string) $case->status).
+                ($case->program?->name ? ' on the "'.$case->program->name.'" programme' : ''),
+            $case->start_date ? 'Started '.$case->start_date->toDateString().
+                ($case->target_end_date ? ', due to finish '.$case->target_end_date->toDateString() : '') : null,
+            'Checklist: '.$resolved->count().' of '.$tasks->count().' tasks done',
+            $overdue->isNotEmpty()
+                ? 'Overdue ('.$overdue->count().'): '.$overdue->take(5)->map(
+                    fn (OnboardingTask $task): string => $task->title.' — due '.$task->due_date?->toDateString(),
+                )->implode('; ')
+                : null,
+            $overdue->isEmpty() && $next instanceof OnboardingTask
+                ? 'Next due: '.$next->title.' on '.$next->due_date?->toDateString()
+                : null,
+            $case->completed_at ? 'Completed '.$case->completed_at->toDateString() : null,
+        ]);
     }
 
     protected function toolMap(): array

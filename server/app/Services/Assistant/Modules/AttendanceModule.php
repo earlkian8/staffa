@@ -5,6 +5,10 @@ namespace App\Services\Assistant\Modules;
 use App\Models\AttendanceRecord;
 use App\Models\Employee;
 use App\Models\User;
+use App\Queries\AttendanceRangeQuery;
+use App\Services\Assistant\Contracts\ContributesContext;
+use App\Services\Assistant\Retrieval\ContextSection;
+use App\Services\Assistant\Retrieval\RetrievedSubject;
 use App\Services\Assistant\ToolResult;
 use App\Support\ActivityLogger;
 use App\Support\Attendance\AttendanceClock;
@@ -16,7 +20,7 @@ use Illuminate\Support\Carbon;
  * clock punch on their behalf. Every punch goes through {@see AttendanceClock} —
  * the same engine the web and mobile API use — so totals and status stay correct.
  */
-class AttendanceModule extends Module
+class AttendanceModule extends Module implements ContributesContext
 {
     public function __construct(private readonly AttendanceClock $clock) {}
 
@@ -41,6 +45,103 @@ class AttendanceModule extends Module
     public function run(User $user, string $tool, array $args): ToolResult
     {
         return $this->{$this->toolMap()[$tool]}($user, $args);
+    }
+
+    /** How far back an attendance read-out looks when nobody says otherwise. */
+    private const CONTEXT_DAYS = 30;
+
+    /** Statuses that mean the employee showed up. */
+    private const PRESENT_STATUSES = ['present', 'late', 'undertime', 'incomplete'];
+
+    /**
+     * How this person has actually been turning up — the closest thing the
+     * assistant has to an answer for "how are they doing?".
+     *
+     * It is built from the same day-matrix the weekly grid and the monthly
+     * report are built from ({@see AttendanceRangeQuery}), so a day with no
+     * record still counts as the absence or the rest day it was, rather than
+     * quietly not existing. A read-out from saved punches alone would flatter
+     * everybody who never clocked in at all.
+     *
+     * Their own DTR is readable without `attendance.view`, because
+     * `/attendance/me` is.
+     */
+    public function contextFor(User $user, RetrievedSubject $subject): ?ContextSection
+    {
+        $employee = $subject->employeeModel();
+
+        if ($employee === null || (! $subject->isSelf && $user->cannot('attendance.view'))) {
+            return null;
+        }
+
+        $end = Carbon::today();
+        $start = $end->copy()->subDays(self::CONTEXT_DAYS - 1);
+
+        $row = app(AttendanceRangeQuery::class)
+            ->days($start->toDateString(), $end->toDateString(), null, (string) $employee->employee_no)
+            ->first(fn (array $row): bool => $row['employee']->id === $employee->id);
+
+        $cells = array_values(array_filter(
+            $row['cells'] ?? [],
+            fn (array $cell): bool => ! $cell['is_future'] && $cell['status'] !== null,
+        ));
+
+        if ($cells === []) {
+            return null;
+        }
+
+        $counts = [];
+        $lateMinutes = 0;
+        $overtimeMinutes = 0;
+        $workedMinutes = 0;
+        $worked = 0;
+
+        foreach ($cells as $cell) {
+            $counts[$cell['status']] = ($counts[$cell['status']] ?? 0) + 1;
+            $lateMinutes += (int) $cell['late_minutes'];
+            $overtimeMinutes += (int) $cell['overtime_minutes'];
+
+            if (in_array($cell['status'], self::PRESENT_STATUSES, true)) {
+                $worked++;
+                $workedMinutes += (int) $cell['worked_minutes'];
+            }
+        }
+
+        $scheduled = $worked + ($counts['absent'] ?? 0);
+        $late = $counts['late'] ?? 0;
+
+        $recent = array_slice(array_reverse($cells), 0, 5);
+
+        return ContextSection::of('Attendance (last '.self::CONTEXT_DAYS.' days)', [
+            'Window: '.$start->toDateString().' to '.$end->toDateString().', '.count($cells).' days accounted for',
+            'Worked '.$worked.' of '.$scheduled.' scheduled days'.($scheduled > 0 ? ' ('.round($worked / $scheduled * 100).'% attendance)' : ''),
+            'Late on '.$late.' of those days'.($worked > 0 ? ' ('.round(($worked - $late) / $worked * 100).'% on time)' : '').
+                ($lateMinutes > 0 ? ', '.$this->hours($lateMinutes).' late in total' : ''),
+            ($counts['absent'] ?? 0) > 0 ? 'Absent '.$counts['absent'].' day'.($counts['absent'] === 1 ? '' : 's') : 'No unexplained absences',
+            ($counts['on_leave'] ?? 0) > 0 ? 'On approved leave '.$counts['on_leave'].' day'.($counts['on_leave'] === 1 ? '' : 's') : null,
+            ($counts['incomplete'] ?? 0) > 0 ? 'Missing a clock-out on '.$counts['incomplete'].' day'.($counts['incomplete'] === 1 ? '' : 's') : null,
+            $worked > 0 ? 'Averaging '.$this->hours((int) round($workedMinutes / $worked)).' worked per day' : null,
+            $overtimeMinutes > 0 ? $this->hours($overtimeMinutes).' of overtime' : null,
+            'Most recent days — '.implode('; ', array_map(
+                fn (array $cell): string => $cell['date'].': '.str_replace('_', ' ', (string) $cell['status']).
+                    ((int) $cell['late_minutes'] > 0 ? ' ('.$this->hours((int) $cell['late_minutes']).' late)' : ''),
+                $recent,
+            )),
+        ]);
+    }
+
+    /**
+     * Minutes as the hours and minutes a person would say out loud.
+     */
+    private function hours(int $minutes): string
+    {
+        if ($minutes < 60) {
+            return $minutes.'m';
+        }
+
+        $rest = $minutes % 60;
+
+        return intdiv($minutes, 60).'h'.($rest > 0 ? ' '.$rest.'m' : '');
     }
 
     public function guidance(User $user): string

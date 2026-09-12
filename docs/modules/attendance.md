@@ -51,6 +51,13 @@ Everything is tenant-scoped (ADR 0005).
   button flips with the day's state (Clock in → Start break → End break → Clock out),
   capturing geolocation (and an optional selfie) on each punch; plus today's punch
   timeline, a this-month summary, and recent DTR history.
+- **The assistant** reads attendance two ways: `find_attendance` lists an employee's
+  records on request, and — when a chat turn is *about* somebody — the module contributes
+  a 30-day read-out (days worked against days scheduled, punctuality, absences, average
+  hours, overtime, the last five days) to the retrieved brief the answer is composed
+  from. Anybody's needs `attendance.view`; your own needs nothing, because
+  `/attendance/me` needs nothing. See
+  [ADR 0035](../decisions/0035-assistant-answers-from-a-retrieved-brief.md).
 - **Mobile API** (`/api`, token-authenticated) — the same clock engine for a future DTR
   app: `POST /api/auth/login`, `GET /api/attendance/today`, `POST /api/attendance/punch`
   (with GPS + selfie), `GET /api/attendance/records`.

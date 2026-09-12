@@ -113,7 +113,12 @@ dependency is needed; office files are named in the digest but not uploaded.
 ## The agentic assistant
 
 Everything a recruiter can do on the board, the **Synapse assistant** can do in
-conversation. `App\Services\Assistant\Modules\RecruitmentModule` is the largest
+conversation, and a chat turn *about* a candidate is answered from a **retrieved brief**
+the module contributes to before the model is called — what they applied for, how far
+each application got, and what the interviews said
+([ADR 0035](../decisions/0035-assistant-answers-from-a-retrieved-brief.md)). For somebody
+who already works here it contributes one line instead: the vacancy they were hired
+into. `App\Services\Assistant\Modules\RecruitmentModule` is the largest
 capability in the assistant registry — **25 Gemini function declarations** — and the
 *why* is in [ADR 0024](../decisions/0024-agentic-recruitment-and-permission-scoped-tools.md).
 The model only *decides*; the module *enforces* (permission, validation, tenancy,

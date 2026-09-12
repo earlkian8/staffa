@@ -17,6 +17,9 @@ use App\Models\RecruitmentPipeline;
 use App\Models\RecruitmentPipelineStage;
 use App\Models\User;
 use App\Queries\RecruitmentStatistics;
+use App\Services\Assistant\Contracts\ContributesContext;
+use App\Services\Assistant\Retrieval\ContextSection;
+use App\Services\Assistant\Retrieval\RetrievedSubject;
 use App\Services\Assistant\ToolResult;
 use App\Support\ActivityLogger;
 use App\Support\ApplicantDocumentStore;
@@ -50,7 +53,7 @@ use RuntimeException;
  * {@see ApplicantDocumentStore} for file cleanup. Tools are advertised only to
  * users whose permissions allow them, and each handler re-checks anyway.
  */
-class RecruitmentModule extends Module
+class RecruitmentModule extends Module implements ContributesContext
 {
     /** How many records a find_* tool returns at most. */
     private const FIND_LIMIT = 8;
@@ -75,6 +78,90 @@ class RecruitmentModule extends Module
     public function isAvailable(User $user): bool
     {
         return $user->can('recruitment.view');
+    }
+
+    /**
+     * Where somebody stands in hiring.
+     *
+     * For a **candidate**, that is the whole record: what they applied for, how
+     * far each application got, and what their interviews said. For somebody who
+     * already works here it is one line — the vacancy they were hired into —
+     * because how a colleague was recruited is context for their tenure, not a
+     * file to reopen.
+     */
+    public function contextFor(User $user, RetrievedSubject $subject): ?ContextSection
+    {
+        if ($user->cannot('recruitment.view')) {
+            return null;
+        }
+
+        if ($subject->isEmployee()) {
+            return $this->hiringOrigin($subject);
+        }
+
+        $applicant = $subject->model;
+
+        if (! $applicant instanceof Applicant) {
+            return null;
+        }
+
+        $applications = JobApplication::query()
+            ->where('applicant_id', $applicant->id)
+            ->with(['jobPosting:id,title', 'pipelineStage:id,name,kind', 'interviews'])
+            ->orderByDesc('applied_at')
+            ->limit(5)
+            ->get();
+
+        $interviews = $applications->flatMap(fn (JobApplication $a) => $a->interviews)
+            ->sortByDesc('scheduled_at')
+            ->take(3);
+
+        return ContextSection::of('Candidate record', [
+            trim($applicant->full_name.' — '.(string) $applicant->headline, ' —'),
+            $applicant->current_location ? 'Based in '.$applicant->current_location : null,
+            $applicant->years_experience !== null ? $applicant->years_experience.' years of experience' : null,
+            $applicant->source ? 'Source: '.str_replace('_', ' ', (string) $applicant->source) : null,
+            $applicant->email ? 'Email: '.$applicant->email : null,
+            $applications->isNotEmpty()
+                ? 'Applications — '.$applications->map(fn (JobApplication $a): string => sprintf(
+                    '%s at %s%s',
+                    $a->jobPosting?->title ?? 'a closed vacancy',
+                    $a->pipelineStage?->name ?? 'no stage',
+                    $a->rating !== null ? ', rated '.$a->rating.'/5' : '',
+                ))->implode('; ')
+                : 'No applications on file.',
+            $interviews->isNotEmpty()
+                ? 'Interviews — '.$interviews->map(fn (Interview $i): string => sprintf(
+                    '%s (%s)%s',
+                    $i->scheduled_at?->toDateString() ?? 'unscheduled',
+                    $i->mode ?? 'mode not set',
+                    $i->result ? ', '.$i->result : '',
+                ))->implode('; ')
+                : null,
+        ]);
+    }
+
+    /**
+     * The vacancy an employee came in through, when they came in through one.
+     */
+    private function hiringOrigin(RetrievedSubject $subject): ?ContextSection
+    {
+        $application = JobApplication::query()
+            ->where('hired_employee_id', $subject->id)
+            ->with(['jobPosting:id,title', 'applicant:id,source'])
+            ->orderByDesc('decided_at')
+            ->first();
+
+        if ($application === null) {
+            return null;
+        }
+
+        return ContextSection::of('How they were hired', [
+            'Hired from the "'.($application->jobPosting?->title ?? 'a closed vacancy').'" vacancy'.
+                ($application->decided_at ? ' on '.$application->decided_at->toDateString() : ''),
+            $application->applicant?->source ? 'Applied via '.str_replace('_', ' ', (string) $application->applicant->source) : null,
+            $application->rating !== null ? 'Rated '.$application->rating.'/5 during hiring' : null,
+        ]);
     }
 
     protected function toolMap(): array

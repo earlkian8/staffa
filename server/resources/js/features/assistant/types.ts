@@ -7,11 +7,20 @@ export type AssistantRole = 'user' | 'assistant';
 
 export type AgentStepStatus = 'done' | 'error';
 
+/**
+ * What kind of work a step was. `read` is the assistant consulting the record
+ * before answering — the grounding behind a generated answer, which is worth
+ * telling apart from something it went and changed.
+ */
+export type AgentStepKind = 'read' | 'action';
+
 /** A single thing the agent did while handling a turn (drives the timeline). */
 export type AgentStep = {
     label: string;
     status: AgentStepStatus;
     detail: string | null;
+    /** Absent on turns recorded before reads were distinguished. */
+    kind?: AgentStepKind;
 };
 
 /** Visual kind of a result card — selects its icon on the frontend. */
@@ -35,11 +44,7 @@ export type AgentCardKind =
 
 /** Colour intent of a result card. */
 export type AgentCardTone =
-    | 'positive'
-    | 'info'
-    | 'warning'
-    | 'danger'
-    | 'neutral';
+    'positive' | 'info' | 'warning' | 'danger' | 'neutral';
 
 export type AgentCardAvatar = {
     name: string;

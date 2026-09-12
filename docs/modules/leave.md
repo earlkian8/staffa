@@ -86,6 +86,15 @@ list). Balances are a **list with chips**, not a wide employee×type matrix.
 - Sidebar: **Workforce → Leave Management** gated on `leave.view`;
   **Company Setup → Leave Types** gated on `setup.leave-types.view`.
 
+## The agentic assistant
+
+`App\Services\Assistant\Modules\LeaveModule` files, reviews and cancels requests in
+conversation. It also contributes to the **retrieved brief** a turn about a person is
+answered from — this year's entitlements (through `LeaveBalanceService`, so a figure
+quoted in chat is the figure the balances screen shows), the last five requests, and how
+many are waiting on a decision. Both paths need `leave.view`; see
+[ADR 0035](../decisions/0035-assistant-answers-from-a-retrieved-brief.md).
+
 ## Permissions
 
 `leave.view`, `leave.request` (file / edit / cancel), `leave.manage`

@@ -8,6 +8,9 @@ use App\Models\Employee;
 use App\Models\Position;
 use App\Models\User;
 use App\Models\WorkSchedule;
+use App\Services\Assistant\Contracts\ContributesContext;
+use App\Services\Assistant\Retrieval\ContextSection;
+use App\Services\Assistant\Retrieval\RetrievedSubject;
 use App\Services\Assistant\ToolResult;
 use App\Support\ActivityLogger;
 use App\Support\Employees\EmployeeDisclosure;
@@ -38,7 +41,7 @@ use Illuminate\Validation\Rule;
  * - **Bulk stays coarse.** List reads are capped and carry no contact details,
  *   so the cheapest way to drain the directory is not through here.
  */
-class EmployeeModule extends Module
+class EmployeeModule extends Module implements ContributesContext
 {
     public function key(): string
     {
@@ -99,6 +102,63 @@ class EmployeeModule extends Module
         }
 
         return $this->{$this->toolMap()[$tool]}($user, $args);
+    }
+
+    /**
+     * Who this person is, for a turn that is about them.
+     *
+     * This is the same projection {@see get_employee_profile} returns and the
+     * same deny-list governs it ({@see EmployeeDisclosure}): retrieval is not a
+     * side door around the disclosure policy, it is the policy applied earlier.
+     * Reading a named individual is written to the activity log for the same
+     * reason the tool does it — "who looked up whom" is the question an audit
+     * asks, and an answer composed from a record is still a read of it.
+     */
+    public function contextFor(User $user, RetrievedSubject $subject): ?ContextSection
+    {
+        $employee = $subject->employeeModel();
+
+        if ($employee === null || (! $subject->isSelf && $user->cannot('employees.view'))) {
+            return null;
+        }
+
+        $employee->loadMissing(['department', 'position', 'manager', 'workSchedule']);
+
+        $profile = EmployeeDisclosure::profile($employee);
+
+        if (! $subject->isSelf) {
+            ActivityLogger::log(
+                event: 'viewed',
+                description: "Read {$employee->full_name}'s employee record via assistant",
+                subject: $employee,
+                logName: 'employees',
+                subjectLabel: $employee->full_name,
+            );
+        }
+
+        $reports = $employee->reports()
+            ->orderBy('first_name')
+            ->limit(EmployeeDisclosure::MAX_ROWS)
+            ->get(['id', 'first_name', 'middle_name', 'last_name', 'suffix']);
+
+        $placement = array_values(array_filter([$profile['position'], $profile['department']]));
+
+        return ContextSection::of('Employee record', [
+            $profile['name'].($profile['employee_no'] ? ' — '.$profile['employee_no'] : ''),
+            $placement !== [] ? 'Role: '.implode(', ', $placement) : 'Role: not set',
+            $profile['manager'] ? 'Reports to: '.$profile['manager'] : 'Reports to: nobody on record',
+            'Employment: '.implode(', ', array_values(array_filter([$profile['employment_type'], $profile['status']]))),
+            $profile['date_hired']
+                ? 'Hired '.$profile['date_hired'].($profile['tenure'] ? ' ('.$profile['tenure'].' with the company)' : '')
+                : null,
+            $profile['date_regularized'] ? 'Regularised '.$profile['date_regularized'] : null,
+            $profile['work_schedule'] ? 'Work schedule: '.$profile['work_schedule'] : null,
+            $profile['email'] ? 'Work email: '.$profile['email'] : null,
+            $profile['phone'] ? 'Phone: '.$profile['phone'] : null,
+            $reports->isNotEmpty()
+                ? 'Direct reports ('.$reports->count().'): '.$reports->map(fn (Employee $r): string => $r->full_name)->implode(', ')
+                : null,
+        ], 'Pay, government ID numbers, bank details, home address and date of birth are never available through this assistant — say so and point to the 201 file if asked.');
     }
 
     public function guidance(User $user): string
