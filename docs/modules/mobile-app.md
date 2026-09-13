@@ -80,7 +80,7 @@ every `useQuery` screen refetches against the new company's tenant context.
 | Method & path | Purpose |
 |---|---|
 | `POST /api/auth/register` (public, throttled) | Create an identity; returns a session with `organization: null`, `needs_workspace: true` |
-| `POST /api/auth/login`, `GET /api/me`, `POST /api/auth/logout` | Token session; payload includes the token's `organization` (may be `null`) |
+| `POST /api/auth/login`, `GET /api/me`, `POST /api/auth/logout` | Token session; payload includes the token's `organization` (may be `null`), whose `timezone` is the clock every punch time is shown on, whatever zone the phone is in (ADR 0036) |
 | `POST /api/auth/switch` | Re-issue the token bound to another company the identity belongs to |
 | `POST /api/workspaces/preview` · `POST /api/workspaces/join` | Look up / redeem a company join code (throttled) |
 | `GET /api/invitations` · `POST /api/invitations/preview` · `POST /api/invitations/accept` · `DELETE /api/invitations/{id}` | Invitations addressed to this identity |

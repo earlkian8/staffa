@@ -57,6 +57,9 @@ export function MonthlyReportTable({ report }: { report: MonthlyReport }) {
                         <TableHead className="text-right">Late</TableHead>
                         <TableHead className="text-right">Absent</TableHead>
                         <TableHead className="hidden text-right md:table-cell">
+                            Holidays
+                        </TableHead>
+                        <TableHead className="hidden text-right md:table-cell">
                             Overtime
                         </TableHead>
                         <TableHead className="text-right">Rate</TableHead>
@@ -115,6 +118,15 @@ function Row({ row }: { row: MonthlyRow }) {
                 {row.absent_count > 0 ? (
                     <span className="text-rose-600 dark:text-rose-400">
                         {row.absent_count}
+                    </span>
+                ) : (
+                    <span className="text-muted-foreground">0</span>
+                )}
+            </TableCell>
+            <TableCell className="hidden text-right text-sm tabular-nums md:table-cell">
+                {row.holiday_count > 0 ? (
+                    <span className="text-indigo-600 dark:text-indigo-400">
+                        {row.holiday_count}
                     </span>
                 ) : (
                     <span className="text-muted-foreground">0</span>

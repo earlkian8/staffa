@@ -7,6 +7,7 @@ use App\Http\Requests\Setup\UpdateCompanyProfileRequest;
 use App\Http\Resources\CompanyProfileResource;
 use App\Models\Organization;
 use App\Support\ActivityLogger;
+use App\Support\OrganizationClock;
 use App\Support\Setup\CompanyProfileWriter;
 use App\Support\Tenancy;
 use Illuminate\Http\RedirectResponse;
@@ -30,6 +31,7 @@ class CompanyProfileController extends Controller
     {
         return Inertia::render('setup/company', [
             'company' => (new CompanyProfileResource($this->organization()))->resolve($request),
+            'timezones' => OrganizationClock::options(),
             'can' => ['manage' => $request->user()->can('setup.company.manage')],
         ]);
     }

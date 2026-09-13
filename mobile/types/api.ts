@@ -22,6 +22,8 @@ export type AuthOrganization = {
   name: string;
   logo: string | null;
   initials: string;
+  /** The IANA zone punch times are shown and judged in, e.g. "Asia/Manila" (ADR 0036). */
+  timezone: string;
 };
 
 /** A request to join a company that HR hasn't answered yet (ADR 0026). */

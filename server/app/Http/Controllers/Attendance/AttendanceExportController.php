@@ -7,6 +7,8 @@ use App\Models\AttendanceRecord;
 use App\Queries\AttendanceMonthlyReport;
 use App\Queries\AttendanceRecordsIndexQuery;
 use App\Queries\AttendanceWeeklyQuery;
+use App\Support\OrganizationClock;
+use Carbon\CarbonInterface;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -133,7 +135,7 @@ class AttendanceExportController extends Controller
     private function monthly($handle, array $report): void
     {
         fputcsv($handle, [
-            'Employee', 'Employee No.', 'Department', 'Present Days', 'Late', 'Absent',
+            'Employee', 'Employee No.', 'Department', 'Present Days', 'Late', 'Absent', 'Holidays',
             'Worked (h)', 'Overtime (h)', 'Attendance %',
         ]);
 
@@ -145,6 +147,7 @@ class AttendanceExportController extends Controller
                 $row['present_days'],
                 $row['late_count'],
                 $row['absent_count'],
+                $row['holiday_count'],
                 $row['worked_hours'],
                 $row['overtime_hours'],
                 $row['attendance_rate'] === null ? '' : $row['attendance_rate'],
@@ -152,9 +155,13 @@ class AttendanceExportController extends Controller
         }
     }
 
-    private function time(?Carbon $value): string
+    /**
+     * A stored instant as the organisation's clock showed it — the export is read
+     * by people, and payroll reads 08:30, not 00:30Z (ADR 0036).
+     */
+    private function time(?CarbonInterface $value): string
     {
-        return $value?->format('H:i') ?? '';
+        return $value ? OrganizationClock::local($value)->format('H:i') : '';
     }
 
     private function hours(int $minutes): string

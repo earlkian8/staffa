@@ -3,6 +3,8 @@ import { ChevronDown, Landmark, Trash2, Upload } from 'lucide-react';
 import { useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import InputError from '@/components/input-error';
+import { browserTimeZone, TimezoneSelect } from '@/components/timezone-select';
+import type { TimezoneOption } from '@/components/timezone-select';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -14,6 +16,9 @@ import StepFooter from './step-footer';
 
 type Props = {
     company: CompanyProfile;
+    timezones: TimezoneOption[];
+    /** The step was saved before — keep the zone it chose rather than re-detecting. */
+    savedBefore: boolean;
     logoPreview: string | null;
     onLogoPreview: (url: string | null) => void;
     onNameChange: (name: string) => void;
@@ -27,12 +32,20 @@ type Props = {
  * Step 1 — the company's own identity. Same payload, validation and writer as the
  * Company Profile screen, so nothing learned here has to be re-entered there.
  *
- * Only the display name is required. The statutory employer numbers are folded
- * away because a company registering today often does not have them yet, and an
- * empty required-looking field on the first screen of setup reads as a blocker.
+ * Only the display name and the time zone are required. The statutory employer
+ * numbers are folded away because a company registering today often does not
+ * have them yet, and an empty required-looking field on the first screen of
+ * setup reads as a blocker.
+ *
+ * The time zone is the clock attendance is judged on (ADR 0036). A company
+ * saving this step for the first time starts from the zone this browser is set
+ * to — the owner is usually sitting in the office — rather than a default
+ * nobody chose.
  */
 export default function CompanyStep({
     company,
+    timezones,
+    savedBefore,
     logoPreview,
     onLogoPreview,
     onNameChange,
@@ -41,12 +54,15 @@ export default function CompanyStep({
     onSkip,
     skipping,
 }: Props) {
+    const detectedZone = savedBefore ? null : browserTimeZone(timezones);
+
     const { data, setData, post, processing, errors, transform } = useForm({
         name: company.name ?? '',
         legal_name: company.legal_name ?? '',
         email: company.email ?? '',
         phone: company.phone ?? '',
         address: company.address ?? '',
+        timezone: detectedZone ?? company.timezone,
         tin: company.tin ?? '',
         sss_employer_no: company.sss_employer_no ?? '',
         philhealth_employer_no: company.philhealth_employer_no ?? '',
@@ -264,6 +280,31 @@ export default function CompanyStep({
                     </div>
                 </section>
 
+                <section className="rounded-xl border border-sidebar-border/70 bg-card p-4 shadow-sm md:p-5 dark:border-sidebar-border">
+                    <h2 className="mb-4 text-sm font-semibold">
+                        The clock the company keeps
+                    </h2>
+                    <Field
+                        label="Time zone"
+                        htmlFor="company-timezone"
+                        required
+                        error={errors.timezone}
+                        hint={
+                            detectedZone && data.timezone === detectedZone
+                                ? 'Taken from this browser. Attendance is judged on this clock — change it if the office keeps a different one.'
+                                : 'Attendance is judged on this clock: who was late, what “today” is, and which day a night shift belongs to.'
+                        }
+                    >
+                        <TimezoneSelect
+                            id="company-timezone"
+                            value={data.timezone}
+                            options={timezones}
+                            onChange={(zone) => setData('timezone', zone)}
+                            invalid={Boolean(errors.timezone)}
+                        />
+                    </Field>
+                </section>
+
                 <section className="rounded-xl border border-sidebar-border/70 bg-card shadow-sm dark:border-sidebar-border">
                     <button
                         type="button"
@@ -369,7 +410,7 @@ export default function CompanyStep({
                 onSkip={onSkip}
                 processing={processing}
                 skipping={skipping}
-                disabled={data.name.trim() === ''}
+                disabled={data.name.trim() === '' || data.timezone === ''}
             />
         </form>
     );

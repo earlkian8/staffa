@@ -5,17 +5,49 @@ namespace App\Support\Attendance;
 use App\Models\AttendancePunch;
 use App\Models\AttendanceRecord;
 use App\Models\Employee;
+use App\Models\Holiday;
 use App\Models\LeaveRequest;
+use App\Models\WorkSchedule;
+use App\Support\HolidayCalendar;
+use App\Support\OrganizationClock;
+use Carbon\CarbonImmutable;
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
-use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 
 /**
  * The canonical punch engine. Every clock action — web self-service, the mobile
  * API and the assistant — goes through {@see punch()} so the transition rules,
  * schedule snapshot and recomputation live in exactly one place.
+ *
+ * Three rules hold on every path (ADR 0036):
+ *
+ *  - **A day is the organisation's day.** "Today", a shift's start and the date a
+ *    punch is filed under are read on the tenant's clock ({@see OrganizationClock}),
+ *    never on UTC's.
+ *  - **A day is anchored to its shift.** A clock-out at 06:00 closes the night
+ *    shift that opened at 22:00 the evening before; it does not open a day of its
+ *    own ({@see workDateFor()}).
+ *  - **A rejected punch writes nothing.** The day's state is checked against a
+ *    record that is only saved once the punch has been accepted.
+ *
+ * A day is judged by the rules frozen onto it when it opened ({@see DayRules});
+ * {@see reapplySchedule()} is the one deliberate way those change.
  */
 class AttendanceClock
 {
+    /**
+     * How long after a clock-in a later punch can still belong to that shift —
+     * long enough for a double shift, short enough that a forgotten clock-out does
+     * not swallow the next day. A constant until attendance policies exist.
+     */
+    public const MAX_SHIFT_SPAN_HOURS = 16;
+
+    /**
+     * How long before a shift starts a clock-in still counts towards it.
+     */
+    public const EARLY_CLOCK_IN_HOURS = 4;
+
     /**
      * Record a punch for an employee and return the (recomputed, saved) day record.
      *
@@ -29,46 +61,99 @@ class AttendanceClock
             throw new AttendancePunchException('That punch type is not recognised.');
         }
 
-        $at = isset($context['punched_at']) ? Carbon::parse($context['punched_at']) : Carbon::now();
-        $record = $this->openRecord($employee, $at->toDateString());
+        $at = (isset($context['punched_at']) ? CarbonImmutable::parse($context['punched_at']) : CarbonImmutable::now())->utc();
 
-        $this->assertAllowed($record, $type);
+        return DB::transaction(function () use ($employee, $type, $context, $at): AttendanceRecord {
+            // One punch at a time per employee: two taps racing each other must not
+            // both pass the state check below, nor both open the same day.
+            Employee::query()->whereKey($employee->getKey())->lockForUpdate()->first(['id']);
 
-        $record->punches()->create([
-            'employee_id' => $employee->id,
-            'type' => $type,
-            'punched_at' => $at,
-            'source' => $context['source'] ?? 'web',
-            'latitude' => $context['latitude'] ?? null,
-            'longitude' => $context['longitude'] ?? null,
-            'accuracy' => $context['accuracy'] ?? null,
-            'photo' => $context['photo'] ?? null,
-            'note' => $context['note'] ?? null,
-            'recorded_by' => $context['recorded_by'] ?? null,
-        ]);
+            $date = $this->workDateFor($employee, $at, $type);
+            $record = $this->findRecord($employee->id, $date, lock: true) ?? $this->newRecord($employee, $date);
 
-        $this->refresh($record, $employee);
+            // Checked before anything is written, so a refused punch leaves no row.
+            $this->assertAllowed($record, $type);
 
-        return $record;
+            if (! $record->exists) {
+                $record->save();
+            }
+
+            $record->punches()->create([
+                'employee_id' => $employee->id,
+                'type' => $type,
+                'punched_at' => $at,
+                'source' => $context['source'] ?? 'web',
+                'latitude' => $context['latitude'] ?? null,
+                'longitude' => $context['longitude'] ?? null,
+                'accuracy' => $context['accuracy'] ?? null,
+                'photo' => $context['photo'] ?? null,
+                'note' => $context['note'] ?? null,
+                'recorded_by' => $context['recorded_by'] ?? null,
+            ]);
+
+            $this->refresh($record);
+
+            return $record;
+        });
     }
 
     /**
-     * Find (or create) the employee's record for the given date, snapshotting the
-     * schedule times the first time the day is touched.
+     * Which work date a punch at `$at` belongs to. In order:
+     *
+     *  1. **An open shift.** If the employee clocked in within the last
+     *     {@see MAX_SHIFT_SPAN_HOURS} and has not clocked out, the punch belongs to
+     *     that day, whatever the calendar now says. This alone lets a night shift
+     *     clock out, and a double shift run past midnight.
+     *  2. **A shift about to start, or under way.** A clock-in is filed under
+     *     today's or yesterday's shift (the organisation's dates) when it falls in
+     *     that working day's window — from {@see EARLY_CLOCK_IN_HOURS} before the
+     *     start to the end. A 21:30 clock-in for a 22:00 shift belongs to that
+     *     shift; so does a late one at 00:30. A rest day has no shift to claim a
+     *     clock-in from another date.
+     *  3. **Otherwise**, the organisation's calendar date at that instant.
+     */
+    public function workDateFor(Employee $employee, CarbonInterface $at, string $type = 'clock_in'): string
+    {
+        $at = CarbonImmutable::instance($at)->utc();
+
+        $open = $this->openShift($employee, $at);
+
+        if ($open !== null) {
+            return $open->work_date->toDateString();
+        }
+
+        $today = OrganizationClock::localDate($at);
+
+        if ($type === 'clock_in') {
+            $yesterday = CarbonImmutable::parse($today)->subDay()->toDateString();
+
+            foreach ([$today, $yesterday] as $date) {
+                if ($this->withinShiftWindow($employee, $date, $at)) {
+                    return $date;
+                }
+            }
+        }
+
+        return $today;
+    }
+
+    /**
+     * Find (or create) the employee's record for the given date, freezing the
+     * schedule and holiday it will be judged by the first time the day is touched.
+     * For HR's explicit entry of a day — a punch goes through {@see punch()}.
      */
     public function openRecord(Employee $employee, string $date): AttendanceRecord
     {
-        $schedule = $employee->workSchedule;
+        $record = $this->findRecord($employee->id, $date);
 
-        return AttendanceRecord::firstOrCreate(
-            ['employee_id' => $employee->id, 'work_date' => $date],
-            [
-                'work_schedule_id' => $schedule?->id,
-                'scheduled_start' => $schedule?->start_time,
-                'scheduled_end' => $schedule?->end_time,
-                'status' => 'absent',
-            ],
-        );
+        if ($record !== null) {
+            return $record;
+        }
+
+        $record = $this->newRecord($employee, $date);
+        $record->save();
+
+        return $record;
     }
 
     /**
@@ -88,20 +173,11 @@ class AttendanceClock
             return $record;
         }
 
-        $schedule = $employee->workSchedule;
-        $record = new AttendanceRecord([
-            'employee_id' => $employee->id,
-            'work_date' => $date,
-            'work_schedule_id' => $schedule?->id,
-            'scheduled_start' => $schedule?->start_time,
-            'scheduled_end' => $schedule?->end_time,
-            'status' => 'absent',
-        ]);
-        $record->setRelation('punches', new EloquentCollection);
+        $record = $this->newRecord($employee, $date);
 
         AttendanceCalculator::recompute(
             $record,
-            $schedule,
+            $this->rulesFor($record),
             $this->isOnApprovedLeave($employee->id, $date),
         );
 
@@ -109,8 +185,22 @@ class AttendanceClock
     }
 
     /**
+     * The day an employee's clock card shows right now: the shift they are on, or
+     * the day their next clock-in would open. A night-shift worker at 02:00 sees
+     * the shift they started last night, not an empty new date.
+     */
+    public function currentRecord(Employee $employee): AttendanceRecord
+    {
+        return $this->displayRecord($employee, $this->workDateFor($employee, CarbonImmutable::now(), 'clock_in'));
+    }
+
+    /**
      * Replace a record's punches with HR-entered manual times, mark it manual and
      * recompute. Absent fields are simply omitted (e.g. a no-show keeps no punches).
+     *
+     * Times are clock-face readings on the organisation's clock for the record's
+     * work date. A reading earlier than the one before it is the next morning, so a
+     * night shift is entered the way it is worked: in 22:00, out 06:00.
      *
      * @param  array{time_in?: ?string, break_start?: ?string, break_end?: ?string, time_out?: ?string}  $times  Clock-face "HH:MM" values.
      */
@@ -119,7 +209,9 @@ class AttendanceClock
         $record->punches()->delete();
 
         $date = $record->work_date->toDateString();
+        $nextDate = CarbonImmutable::parse($date)->addDay()->toDateString();
         $map = ['time_in' => 'clock_in', 'break_start' => 'break_start', 'break_end' => 'break_end', 'time_out' => 'clock_out'];
+        $previous = null;
 
         foreach ($map as $field => $type) {
             $time = trim((string) ($times[$field] ?? ''));
@@ -128,13 +220,21 @@ class AttendanceClock
                 continue;
             }
 
+            $at = OrganizationClock::at($date, $time);
+
+            if ($previous !== null && $at->lt($previous)) {
+                $at = OrganizationClock::at($nextDate, $time);
+            }
+
             $record->punches()->create([
                 'employee_id' => $record->employee_id,
                 'type' => $type,
-                'punched_at' => Carbon::parse($date)->setTimeFromTimeString($time),
+                'punched_at' => $at,
                 'source' => 'manual',
                 'recorded_by' => $recordedBy,
             ]);
+
+            $previous = $at;
         }
 
         $record->is_manual = true;
@@ -144,15 +244,128 @@ class AttendanceClock
     /**
      * Reload the punches and recompute every derived field, then persist.
      */
-    public function refresh(AttendanceRecord $record, ?Employee $employee = null): void
+    public function refresh(AttendanceRecord $record): void
     {
-        $employee ??= $record->employee;
+        $this->evaluate($record);
+        $record->save();
+    }
+
+    /**
+     * Recompute every derived field from the record's punches and its frozen
+     * rules, without saving. A record from before snapshots existed is given one
+     * first ({@see fillSnapshot()}).
+     */
+    public function evaluate(AttendanceRecord $record): void
+    {
+        $rules = $this->rulesFor($record);
         $record->load('punches');
 
-        $onLeave = $this->isOnApprovedLeave($record->employee_id, $record->work_date->toDateString());
+        AttendanceCalculator::recompute(
+            $record,
+            $rules,
+            $this->isOnApprovedLeave($record->employee_id, $record->work_date->toDateString()),
+        );
+    }
 
-        AttendanceCalculator::recompute($record, $employee?->workSchedule, $onLeave);
+    /**
+     * Re-judge a day by the employee's **current** schedule and holiday calendar —
+     * the one deliberate way a day's snapshot changes. Saves, and returns whether
+     * anything about the day moved. The caller logs it.
+     *
+     * @param  array<string, Holiday>|null  $holidays  The range's holidays keyed by "Y-m-d", when the caller has already loaded them.
+     */
+    public function reapplySchedule(AttendanceRecord $record, ?array $holidays = null): bool
+    {
+        $record->loadMissing('employee.workSchedule');
+        $date = $record->work_date->toDateString();
+
+        $this->snapshot(
+            $record,
+            $record->employee?->workSchedule,
+            $holidays !== null ? ($holidays[$date] ?? null) : HolidayCalendar::on($date),
+        );
+        $this->evaluate($record);
+
+        $changed = $record->isDirty();
         $record->save();
+
+        return $changed;
+    }
+
+    /**
+     * Freeze a schedule onto a record: which schedule applied, its clock-face
+     * times, the instants those times fall on for this work date in the
+     * organisation's zone, and the rules the day is judged by.
+     */
+    public function snapshot(AttendanceRecord $record, ?WorkSchedule $schedule, ?Holiday $holiday): void
+    {
+        $date = $record->work_date->toDateString();
+
+        [$start, $end] = self::shiftInstants($date, $schedule?->start_time, $schedule?->end_time);
+
+        $record->work_schedule_id = $schedule?->id;
+        $record->scheduled_start = $schedule?->start_time;
+        $record->scheduled_end = $schedule?->end_time;
+        $record->scheduled_start_at = $start;
+        $record->scheduled_end_at = $end;
+        $record->rules = DayRules::fromSchedule($schedule, $date, $holiday)->toArray();
+    }
+
+    /**
+     * Give a record written before snapshots existed the snapshot it should have
+     * had, from what it did record: the times it copied, and the schedule it names
+     * (archived or not) — never the employee's schedule today. Does not save;
+     * returns whether anything was filled.
+     *
+     * @param  array<string, Holiday>|null  $holidays  The range's holidays keyed by "Y-m-d", when the caller has already loaded them.
+     */
+    public function fillSnapshot(AttendanceRecord $record, ?array $holidays = null): bool
+    {
+        $date = $record->work_date->toDateString();
+        $filled = false;
+
+        if ($record->scheduled_start_at === null && $record->scheduled_end_at === null
+            && ($record->scheduled_start !== null || $record->scheduled_end !== null)) {
+            [$start, $end] = self::shiftInstants($date, $record->scheduled_start, $record->scheduled_end);
+
+            $record->scheduled_start_at = $start;
+            $record->scheduled_end_at = $end;
+            $filled = true;
+        }
+
+        if ($record->rules === null) {
+            $schedule = $record->work_schedule_id !== null
+                ? WorkSchedule::withTrashed()->find($record->work_schedule_id)
+                : null;
+            $holiday = $holidays !== null ? ($holidays[$date] ?? null) : HolidayCalendar::on($date);
+
+            $record->rules = DayRules::fromSchedule($schedule, $date, $holiday)->toArray();
+            $filled = true;
+        }
+
+        return $filled;
+    }
+
+    /**
+     * The instants a shift's clock-face times fall on for a work date, in the
+     * organisation's zone. An end at or before the start is the next morning — a
+     * 22:00–06:00 shift ends on the following day.
+     *
+     * @return array{0: ?CarbonImmutable, 1: ?CarbonImmutable}
+     */
+    public static function shiftInstants(string $date, ?string $start, ?string $end): array
+    {
+        $start = trim((string) $start);
+        $end = trim((string) $end);
+
+        $startAt = $start === '' ? null : OrganizationClock::at($date, $start);
+        $endAt = $end === '' ? null : OrganizationClock::at($date, $end);
+
+        if ($startAt !== null && $endAt !== null && $endAt->lte($startAt)) {
+            $endAt = OrganizationClock::at(CarbonImmutable::parse($date)->addDay()->toDateString(), $end);
+        }
+
+        return [$startAt, $endAt];
     }
 
     /**
@@ -234,6 +447,88 @@ class AttendanceClock
         }
 
         return ['onClock' => $onClock, 'onBreak' => $onBreak];
+    }
+
+    /**
+     * The employee's most recent day, when it is still open and began recently
+     * enough for a punch now to belong to it.
+     */
+    private function openShift(Employee $employee, CarbonImmutable $at): ?AttendanceRecord
+    {
+        $latest = AttendanceRecord::query()
+            ->where('employee_id', $employee->id)
+            ->whereNotNull('first_in_at')
+            ->whereBetween('first_in_at', [$at->subHours(self::MAX_SHIFT_SPAN_HOURS), $at])
+            ->orderByDesc('first_in_at')
+            ->first();
+
+        return $latest !== null && $this->state($latest)['onClock'] ? $latest : null;
+    }
+
+    /**
+     * Whether an instant falls in a working day's shift window — from
+     * {@see EARLY_CLOCK_IN_HOURS} before the shift starts until it ends. Read from
+     * the day's snapshot when the day already exists, otherwise from the
+     * employee's schedule.
+     */
+    private function withinShiftWindow(Employee $employee, string $date, CarbonImmutable $at): bool
+    {
+        $record = $this->findRecord($employee->id, $date);
+
+        if ($record?->scheduled_start_at !== null && $record->scheduled_end_at !== null) {
+            $start = $record->scheduled_start_at;
+            $end = $record->scheduled_end_at;
+            $working = $this->rulesFor($record)->isWorkingDay;
+        } else {
+            $schedule = $employee->workSchedule;
+            [$start, $end] = self::shiftInstants($date, $schedule?->start_time, $schedule?->end_time);
+            $working = AttendanceCalculator::isWorkingDay(CarbonImmutable::parse($date), $schedule);
+        }
+
+        if (! $working || $start === null || $end === null) {
+            return false;
+        }
+
+        return $at->getTimestamp() >= $start->getTimestamp() - self::EARLY_CLOCK_IN_HOURS * 3600
+            && $at->getTimestamp() <= $end->getTimestamp();
+    }
+
+    /**
+     * The rules a record is judged by — its snapshot, given one first if it is a
+     * record from before snapshots existed.
+     */
+    private function rulesFor(AttendanceRecord $record): DayRules
+    {
+        $this->fillSnapshot($record);
+
+        return DayRules::fromArray($record->rules);
+    }
+
+    private function findRecord(int $employeeId, string $date, bool $lock = false): ?AttendanceRecord
+    {
+        return AttendanceRecord::query()
+            ->where('employee_id', $employeeId)
+            ->whereDate('work_date', $date)
+            ->when($lock, fn ($query) => $query->lockForUpdate())
+            ->first();
+    }
+
+    /**
+     * An unsaved record for the employee's day with the rules it will be judged by
+     * already frozen onto it — saved only once something is actually recorded.
+     */
+    private function newRecord(Employee $employee, string $date): AttendanceRecord
+    {
+        $record = new AttendanceRecord([
+            'employee_id' => $employee->id,
+            'work_date' => $date,
+            'status' => 'absent',
+        ]);
+
+        $this->snapshot($record, $employee->workSchedule, HolidayCalendar::on($date));
+        $record->setRelation('punches', new EloquentCollection);
+
+        return $record;
     }
 
     private function isOnApprovedLeave(int $employeeId, string $date): bool

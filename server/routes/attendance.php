@@ -23,6 +23,7 @@ Route::middleware(['auth', 'verified'])
         // Board-wide actions (literal segments — declared before the wildcard).
         Route::get('export', AttendanceExportController::class)->middleware('can:attendance.view')->name('export');
         Route::patch('approve-all', [AttendanceController::class, 'approveAll'])->middleware('can:attendance.manage')->name('approve-all');
+        Route::patch('reapply-schedule', [AttendanceController::class, 'reapplyRange'])->middleware('can:attendance.manage')->name('reapply-range');
 
         // Self-service (any authenticated user linked to an employee).
         Route::get('me', [MyAttendanceController::class, 'index'])->name('me');
@@ -32,5 +33,6 @@ Route::middleware(['auth', 'verified'])
         Route::get('records/{attendanceRecord}', [AttendanceController::class, 'show'])->middleware('can:attendance.view')->name('show');
         Route::post('records/{attendanceRecord}', [AttendanceController::class, 'update'])->middleware('can:attendance.manage')->name('update');
         Route::patch('records/{attendanceRecord}/approve', [AttendanceController::class, 'approve'])->middleware('can:attendance.manage')->name('approve');
+        Route::patch('records/{attendanceRecord}/reapply-schedule', [AttendanceController::class, 'reapply'])->middleware('can:attendance.manage')->name('reapply');
         Route::delete('records/{attendanceRecord}', [AttendanceController::class, 'destroy'])->middleware('can:attendance.manage')->name('destroy');
     });

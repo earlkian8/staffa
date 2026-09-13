@@ -10,9 +10,10 @@ use App\Models\Employee;
 use App\Support\ActivityLogger;
 use App\Support\Attendance\AttendanceClock;
 use App\Support\Attendance\AttendancePunchException;
+use App\Support\OrganizationClock;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Carbon;
 use Inertia\Inertia;
 use Inertia\Response;
 use Symfony\Component\HttpKernel\Exception\HttpException;
@@ -32,14 +33,15 @@ class MyAttendanceController extends Controller
     public function index(Request $request): Response
     {
         $employee = $this->employee($request);
-        $today = Carbon::today()->toDateString();
 
-        $record = $this->clock->displayRecord($employee, $today);
+        // The shift they are on (a night shift after midnight included), or the
+        // day their next clock-in would open.
+        $record = $this->clock->currentRecord($employee);
 
         $history = AttendanceRecord::query()
             ->with('punches')
             ->where('employee_id', $employee->id)
-            ->whereDate('work_date', '>=', Carbon::today()->subDays(30)->toDateString())
+            ->whereDate('work_date', '>=', CarbonImmutable::parse(OrganizationClock::today())->subDays(30)->toDateString())
             ->orderByDesc('work_date')
             ->get();
 
@@ -120,10 +122,12 @@ class MyAttendanceController extends Controller
      */
     private function monthSummary(int $employeeId): array
     {
+        $now = OrganizationClock::now();
+
         $records = AttendanceRecord::query()
             ->where('employee_id', $employeeId)
-            ->whereYear('work_date', now()->year)
-            ->whereMonth('work_date', now()->month)
+            ->whereYear('work_date', $now->year)
+            ->whereMonth('work_date', $now->month)
             ->get(['status', 'worked_minutes', 'late_minutes', 'overtime_minutes']);
 
         return [

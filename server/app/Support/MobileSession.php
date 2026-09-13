@@ -143,6 +143,8 @@ class MobileSession
             'name' => $organization->name,
             'logo' => $organization->logo_url,
             'initials' => $organization->initials(),
+            // The clock the app shows punch times on, whatever zone the phone is in.
+            'timezone' => $organization->timezone,
         ];
     }
 }

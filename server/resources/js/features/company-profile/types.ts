@@ -1,3 +1,5 @@
+import type { TimezoneOption } from '@/components/timezone-select';
+
 export type CompanyProfile = {
     id: number;
     name: string;
@@ -6,6 +8,8 @@ export type CompanyProfile = {
     email: string | null;
     phone: string | null;
     address: string | null;
+    /** The IANA zone attendance is judged on, e.g. "Asia/Manila". */
+    timezone: string;
     tin: string | null;
     sss_employer_no: string | null;
     philhealth_employer_no: string | null;
@@ -22,5 +26,6 @@ export type CompanyProfilePermissions = {
 
 export type CompanyProfilePageProps = {
     company: CompanyProfile;
+    timezones: TimezoneOption[];
     can: CompanyProfilePermissions;
 };

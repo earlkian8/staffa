@@ -2,7 +2,9 @@
 
 The tables behind the [Attendance module](../modules/attendance.md), created by
 `…_create_attendance_tables`. Both are tenant-scoped (`organization_id`). See
-[ADR 0010](../decisions/0010-attendance-and-mobile-api.md).
+[ADR 0010](../decisions/0010-attendance-and-mobile-api.md) and
+[ADR 0036](../decisions/0036-attendance-judged-in-local-time-on-shift-anchored-dates.md)
+(the shift instants and the `rules` snapshot, added by `…_snapshot_rules_on_attendance_records`).
 
 ## `attendance_records`
 
@@ -14,16 +16,18 @@ day's punches (never trusted from the client).
 | `id` | bigint (PK) | |
 | `organization_id` | FK → organizations | Tenant. |
 | `employee_id` | FK → employees | Cascade on delete. |
-| `work_date` | date | The day this record covers. |
+| `work_date` | date | The work date the shift belongs to — a night shift that ends the next morning stays on the date it started. |
 | `work_schedule_id` | FK → work_schedules, nullable | Snapshot of the schedule that applied. |
-| `scheduled_start` / `scheduled_end` | time, nullable | Snapshot of the schedule's times. |
+| `scheduled_start` / `scheduled_end` | time, nullable | Snapshot of the schedule's clock-face times (for display). |
+| `scheduled_start_at` / `scheduled_end_at` | timestamp, nullable | The shift as UTC instants, worked out in the organisation's zone; the end is the next morning when it is at or before the start. What lateness and undertime are measured against. |
+| `rules` | json, nullable | The `DayRules` snapshot the day is judged by: `version`, `grace_minutes`, `required_minutes`, `is_working_day`, `work_schedule_id`, `schedule_name`, `holiday_type`, `holiday_name`. Changes only when HR re-applies the current schedule. Null on rows from before ADR 0036 until they are recomputed. |
 | `status` | string | `present \| late \| undertime \| absent \| on_leave \| day_off \| holiday \| incomplete`. |
 | `first_in_at` / `last_out_at` | timestamp, nullable | Derived from the punches. |
 | `worked_minutes` | uint | On-the-clock minutes, breaks excluded. |
 | `break_minutes` | uint | Total break time. |
-| `late_minutes` | uint | `first_in − (scheduled_start + grace)`, clamped at 0. |
-| `undertime_minutes` | uint | Time clocked out before `scheduled_end`. |
-| `overtime_minutes` | uint | `worked − required_hours`, clamped at 0. |
+| `late_minutes` | uint | `first_in − (scheduled_start_at + grace)`, clamped at 0. |
+| `undertime_minutes` | uint | Time clocked out before `scheduled_end_at`. |
+| `overtime_minutes` | uint | `worked − required_minutes` (from `rules`), clamped at 0. |
 | `is_manual` | boolean | True when entered/edited by HR. |
 | `remarks` | text, nullable | |
 | `approval_status` | string, nullable | `pending \| approved \| rejected` (correction / overtime sign-off). |

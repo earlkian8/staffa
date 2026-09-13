@@ -17,6 +17,7 @@ use App\Models\Organization;
 use App\Models\RecruitmentPipeline;
 use App\Models\ReviewTemplate;
 use App\Support\ActivityLogger;
+use App\Support\OrganizationClock;
 use App\Support\Performance\RatingModel;
 use App\Support\Setup\CompanyProfileWriter;
 use App\Support\Setup\CompanySetup;
@@ -75,6 +76,9 @@ class SetupWizardController extends Controller
 
         return Inertia::render('setup/wizard', [
             'company' => (new CompanyProfileResource($organization))->resolve($request),
+
+            // Step one asks which clock the company keeps (ADR 0036).
+            'timezones' => OrganizationClock::options(),
 
             'progress' => [
                 'steps' => CompanySetup::statuses($organization),

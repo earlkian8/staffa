@@ -25,6 +25,15 @@ class AttendanceRecordResource extends JsonResource
             'status' => $this->status,
             'scheduled_start' => $this->formatTime($this->scheduled_start),
             'scheduled_end' => $this->formatTime($this->scheduled_end),
+            'scheduled_start_at' => $this->scheduled_start_at?->toIso8601String(),
+            'scheduled_end_at' => $this->scheduled_end_at?->toIso8601String(),
+
+            // What the day was judged by (ADR 0036) — the schedule and holiday in
+            // force when it opened, not the ones in force today.
+            'schedule_name' => $this->rules['schedule_name'] ?? null,
+            'holiday' => isset($this->rules['holiday_type'])
+                ? ['name' => $this->rules['holiday_name'] ?? null, 'type' => $this->rules['holiday_type']]
+                : null,
 
             'first_in_at' => $this->first_in_at?->toIso8601String(),
             'last_out_at' => $this->last_out_at?->toIso8601String(),

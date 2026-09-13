@@ -19,6 +19,7 @@ import {
     TooltipContent,
     TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { useOrganizationTimeZone } from '@/hooks/use-organization-time-zone';
 import { cn } from '@/lib/utils';
 import { formatDuration, formatTime, recordAnomalies } from '../constants';
 import type { AttendanceRecord } from '../types';
@@ -161,6 +162,7 @@ function Row({
     record: AttendanceRecord;
     onOpen: (record: AttendanceRecord) => void;
 }) {
+    const timeZone = useOrganizationTimeZone();
     const employee = record.employee;
     const anomalies = recordAnomalies(record);
     const worked = record.worked_minutes > 0;
@@ -197,10 +199,10 @@ function Row({
             </TableCell>
 
             <TableCell className="hidden text-right text-sm tabular-nums sm:table-cell">
-                {formatTime(record.first_in_at)}
+                {formatTime(record.first_in_at, timeZone)}
             </TableCell>
             <TableCell className="hidden text-right text-sm tabular-nums sm:table-cell">
-                {formatTime(record.last_out_at)}
+                {formatTime(record.last_out_at, timeZone)}
             </TableCell>
 
             <TableCell className="text-right text-sm font-medium tabular-nums">

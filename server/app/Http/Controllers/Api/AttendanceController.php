@@ -10,9 +10,9 @@ use App\Models\Employee;
 use App\Support\ActivityLogger;
 use App\Support\Attendance\AttendanceClock;
 use App\Support\Attendance\AttendancePunchException;
+use App\Support\OrganizationClock;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Carbon;
 
 /**
  * The mobile DTR surface: the same {@see AttendanceClock} the web self-service
@@ -24,13 +24,14 @@ class AttendanceController extends Controller
     public function __construct(private readonly AttendanceClock $clock) {}
 
     /**
-     * Today's record plus the next expected and allowed punches (drives the app's
-     * primary button).
+     * The current day's record plus the next expected and allowed punches (drives
+     * the app's primary button). "Current" is the shift the employee is on — a
+     * night shift after midnight included — or the day a clock-in would open.
      */
     public function today(Request $request): JsonResponse
     {
         $employee = $this->employee($request);
-        $record = $this->clock->displayRecord($employee, Carbon::today()->toDateString());
+        $record = $this->clock->currentRecord($employee);
 
         return response()->json([
             'data' => (new AttendanceRecordResource($record))->resolve($request),
@@ -106,8 +107,8 @@ class AttendanceController extends Controller
     {
         $employee = $this->employee($request);
 
-        $from = $request->filled('from') ? $request->date('from') : Carbon::today()->startOfMonth();
-        $to = $request->filled('to') ? $request->date('to') : Carbon::today()->endOfMonth();
+        $from = $request->filled('from') ? $request->date('from') : OrganizationClock::now()->startOfMonth();
+        $to = $request->filled('to') ? $request->date('to') : OrganizationClock::now()->endOfMonth();
 
         $records = AttendanceRecord::query()
             ->where('employee_id', $employee->id)

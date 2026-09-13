@@ -35,6 +35,11 @@ export type Punch = {
     recorder: string | null;
 };
 
+export type AttendanceHoliday = {
+    name: string | null;
+    type: 'regular' | 'special_non_working' | 'special_working';
+};
+
 export type AttendanceRecord = {
     id: number | null;
     hashid: string | null;
@@ -42,6 +47,13 @@ export type AttendanceRecord = {
     status: AttendanceStatus;
     scheduled_start: string | null;
     scheduled_end: string | null;
+    /** The shift as instants — a night shift's end is the next morning. */
+    scheduled_start_at?: string | null;
+    scheduled_end_at?: string | null;
+    /** The schedule the day was judged by, as it was named then. */
+    schedule_name?: string | null;
+    /** The holiday the day fell on, when it was judged. */
+    holiday?: AttendanceHoliday | null;
     first_in_at: string | null;
     last_out_at: string | null;
     worked_minutes: number;
@@ -115,6 +127,8 @@ export type WeekCell = {
     undertime_minutes: number;
     first_in_at: string | null;
     last_out_at: string | null;
+    /** The holiday's name, when the day is one. */
+    holiday: string | null;
     hashid: string | null;
     is_future: boolean;
 };
@@ -138,6 +152,7 @@ export type MonthlyRow = {
     present_days: number;
     late_count: number;
     absent_count: number;
+    holiday_count: number;
     overtime_hours: number;
     worked_hours: number;
     attendance_rate: number | null;

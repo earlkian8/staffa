@@ -38,7 +38,7 @@ import type { Auth } from '@/types';
  * about to spend their time.
  */
 export default function SetupWizardPage() {
-    const { company, progress, blueprints, existing, can } =
+    const { company, timezones, progress, blueprints, existing, can } =
         usePage<SetupWizardPageProps>().props;
     const { auth } = usePage<{ auth: Auth }>().props;
 
@@ -149,6 +149,10 @@ export default function SetupWizardPage() {
                                 <CompanyStep
                                     {...stepProps}
                                     company={company}
+                                    timezones={timezones}
+                                    savedBefore={
+                                        progress.steps.company === 'done'
+                                    }
                                     logoPreview={logoPreview}
                                     onLogoPreview={setLogoPreview}
                                     onNameChange={setDraftName}

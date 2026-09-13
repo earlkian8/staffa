@@ -13,6 +13,8 @@ use App\Services\Assistant\ToolResult;
 use App\Support\ActivityLogger;
 use App\Support\Attendance\AttendanceClock;
 use App\Support\Attendance\AttendancePunchException;
+use App\Support\OrganizationClock;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Carbon;
 
 /**
@@ -74,8 +76,8 @@ class AttendanceModule extends Module implements ContributesContext
             return null;
         }
 
-        $end = Carbon::today();
-        $start = $end->copy()->subDays(self::CONTEXT_DAYS - 1);
+        $end = CarbonImmutable::parse(OrganizationClock::today());
+        $start = $end->subDays(self::CONTEXT_DAYS - 1);
 
         $row = app(AttendanceRangeQuery::class)
             ->days($start->toDateString(), $end->toDateString(), null, (string) $employee->employee_no)
@@ -119,6 +121,7 @@ class AttendanceModule extends Module implements ContributesContext
                 ($lateMinutes > 0 ? ', '.$this->hours($lateMinutes).' late in total' : ''),
             ($counts['absent'] ?? 0) > 0 ? 'Absent '.$counts['absent'].' day'.($counts['absent'] === 1 ? '' : 's') : 'No unexplained absences',
             ($counts['on_leave'] ?? 0) > 0 ? 'On approved leave '.$counts['on_leave'].' day'.($counts['on_leave'] === 1 ? '' : 's') : null,
+            ($counts['holiday'] ?? 0) > 0 ? 'Public holidays (not scheduled) '.$counts['holiday'].' day'.($counts['holiday'] === 1 ? '' : 's') : null,
             ($counts['incomplete'] ?? 0) > 0 ? 'Missing a clock-out on '.$counts['incomplete'].' day'.($counts['incomplete'] === 1 ? '' : 's') : null,
             $worked > 0 ? 'Averaging '.$this->hours((int) round($workedMinutes / $worked)).' worked per day' : null,
             $overtimeMinutes > 0 ? $this->hours($overtimeMinutes).' of overtime' : null,
@@ -149,7 +152,7 @@ class AttendanceModule extends Module implements ContributesContext
         return <<<'TXT'
         ATTENDANCE — Daily Time Records (DTR): one record per employee per day, built from clock in/out and break punches. Worked hours, lateness, undertime and overtime are computed server-side against the employee's work schedule.
         - find_attendance lists an employee's recent records (pass `date` as YYYY-MM-DD for one specific day).
-        - record_punch logs a clock punch for an employee: type is clock_in, clock_out, break_start or break_end. Punch order is validated (you can't clock out before clocking in).
+        - record_punch logs a clock punch for an employee: type is clock_in, clock_out, break_start or break_end. Punch order is validated (you can't clock out before clocking in). Punches are timed on the organisation's clock and filed under the shift they belong to — a night shift's clock-out after midnight closes the previous evening's day.
         - Pass `employee` as a name or employee number.
         TXT;
     }
@@ -296,8 +299,8 @@ class AttendanceModule extends Module implements ContributesContext
     private function recordCard(AttendanceRecord $record, string $kind, string $tone): array
     {
         $employee = $record->employee;
-        $in = $record->first_in_at?->format('g:i A') ?? '—';
-        $out = $record->last_out_at?->format('g:i A') ?? '—';
+        $in = $record->first_in_at ? OrganizationClock::local($record->first_in_at)->format('g:i A') : '—';
+        $out = $record->last_out_at ? OrganizationClock::local($record->last_out_at)->format('g:i A') : '—';
         $hours = round($record->worked_minutes / 60, 1);
 
         return $this->card(

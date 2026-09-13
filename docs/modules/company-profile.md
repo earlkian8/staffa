@@ -16,6 +16,11 @@ A single, sectioned edit form (no list — there is exactly one profile per tena
 - **Brand & identity** — the company **logo** (upload / replace / remove) with an
   initials fallback, the **display name** (required) and the **registered legal name**.
 - **Contact details** — email, phone, address.
+- **Time zone** (required) — a searchable picker of IANA zones with their offsets. It is
+  the clock attendance is judged on — who was late, what "today" is, and which day a
+  night shift belongs to ([ADR 0036](../decisions/0036-attendance-judged-in-local-time-on-shift-anchored-dates.md)) — and every attendance
+  time on the web and the mobile app is shown on it. The browser's own zone is offered
+  with one click when it differs.
 - **Government & statutory** — the employer registration numbers payroll remits against:
   **TIN**, **SSS**, **PhilHealth** and **Pag-IBIG** employer numbers.
 
@@ -26,7 +31,9 @@ bar), so viewers can see the profile but not change it.
 
 No new table. The editable fields already exist on `organizations` (added with
 multi-tenancy): `name`, `legal_name`, `logo`, `email`, `phone`, `address`, `tin`,
-`sss_employer_no`, `philhealth_employer_no`, `pagibig_employer_no`. The `slug` (tenant
+`sss_employer_no`, `philhealth_employer_no`, `pagibig_employer_no` — plus `timezone`,
+added by ADR 0036 (IANA identifier, existing organisations back-filled with
+`Asia/Manila`). The `slug` (tenant
 identity) is **not** editable here. `Organization::logo_url` resolves the stored logo
 path to a public URL; `Organization::initials()` powers the avatar fallback.
 
@@ -37,11 +44,15 @@ path to a public URL; `Organization::initials()` powers the avatar fallback.
   organisation is resolved from `Tenancy` (you can only edit your own tenant — never an
   id from the request).
 - **`UpdateCompanyProfileRequest`** — validates the identity / contact / statutory fields
-  plus `logo` (`image`, `mimes:jpg,jpeg,png,webp,svg`, `max:2048`) and a `remove_logo`
-  flag.
+  plus `logo` (`image`, `mimes:jpg,jpeg,png,webp,svg`, `max:2048`), a `remove_logo`
+  flag, and a required `timezone` from `OrganizationClock::identifiers()` (PHP's
+  canonical list, so a zone has one spelling). The same request backs step one of the
+  setup wizard.
 - **Logo handling** mirrors employee photos: stored on the `public` disk under
   `organization-logos`; the previous file is deleted on replace or removal.
-- **`CompanyProfileResource`** exposes the fields + `logo_url` + `initials`.
+- **`CompanyProfileResource`** exposes the fields + `logo_url` + `initials`; the page also
+  receives `timezones` (`OrganizationClock::options()` — every zone with its current
+  offset, west to east).
 - Routes in `routes/setup.php` (`setup.company.edit` / `setup.company.update`). The update
   is a `POST` so the logo can be sent as multipart. Mutations are activity-logged
   (`logName: 'company-setup'`, like the other Company Setup screens).

@@ -55,9 +55,20 @@ charged on a holiday** (it stays a pure date utility — the DB lookup lives in
 `HolidayCalendar`). Wired into `LeaveRequestController` (file / edit) and the assistant's
 `LeaveModule`. `special_working` holidays remain ordinary working days.
 
-> **Attendance** already reserves a `holiday` daily status but does not yet emit it; wiring
-> the calendar into attendance computation is a deliberate follow-up (a deeper change to
-> the recompute / clock / reprocess pipeline).
+### Integration — attendance judges by schedule and holiday, frozen per day
+
+[Attendance](./attendance.md) reads both catalogues when a day opens and **freezes them
+onto the day** (ADR 0036): the schedule's times become the shift's instants in the
+organisation's zone (an end before the start ends the next morning), and its grace,
+required hours and working days plus the day's holiday go into the record's `rules`
+snapshot. `HolidayCalendar::on()` / `inRange()` return the holiday on a date of **any**
+type (a non-working one wins when two share a date). A `regular` or
+`special_non_working` holiday nobody worked is recorded as `holiday`; a `special_working`
+holiday is an ordinary working day.
+
+> **Editing a schedule or adding a holiday does not change days already recorded.** HR
+> re-applies the current schedule from the attendance board when a past day should be
+> judged by the change.
 
 ## Permissions
 
@@ -76,5 +87,4 @@ Heroes Day (last Monday of August). Work schedules (Day / Night Shift) are seede
 ## Out of scope (this cut)
 
 Per-employee schedule overrides, rotating shift patterns, half-day/holiday **pay** rules,
-movable-feast auto-calculation (Holy Week), region-specific local holidays, and the
-attendance `holiday`-status wiring (the follow-up noted above).
+movable-feast auto-calculation (Holy Week), and region-specific local holidays.

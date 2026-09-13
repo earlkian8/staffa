@@ -9,6 +9,7 @@ import type {
     AttendanceRecord,
     MyAttendancePageProps,
 } from '@/features/attendance/types';
+import { useOrganizationTimeZone } from '@/hooks/use-organization-time-zone';
 
 export default function MyAttendance() {
     const { employee, today, nextExpected, allowed, history, summary, can } =
@@ -113,6 +114,7 @@ function SummaryStat({ label, value }: { label: string; value: string }) {
 }
 
 function HistoryItem({ record }: { record: AttendanceRecord }) {
+    const timeZone = useOrganizationTimeZone();
     const date = record.work_date
         ? new Date(`${record.work_date}T00:00:00`).toLocaleDateString(
               undefined,
@@ -124,8 +126,8 @@ function HistoryItem({ record }: { record: AttendanceRecord }) {
         <li className="flex items-center gap-3 px-5 py-3">
             <div className="w-24 text-sm font-medium">{date}</div>
             <div className="flex-1 text-sm text-muted-foreground tabular-nums">
-                {formatTime(record.first_in_at)} →{' '}
-                {formatTime(record.last_out_at)}
+                {formatTime(record.first_in_at, timeZone)} →{' '}
+                {formatTime(record.last_out_at, timeZone)}
             </div>
             <div className="hidden w-16 text-right text-sm font-medium tabular-nums sm:block">
                 {record.worked_minutes > 0

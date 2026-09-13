@@ -3,15 +3,63 @@
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-/** "8:02 AM" from an ISO timestamp (or "—" when null). */
-export function formatTime(iso: string | null | undefined): string {
+type WallClock = { year: number; month: number; day: number; weekday: number; hours: number; minutes: number };
+
+/**
+ * The calendar and clock fields an instant shows in an IANA zone. Attendance
+ * passes the organisation's zone, so a punch reads the same on every phone
+ * whatever zone the phone itself is set to (ADR 0036). Without a zone — or on a
+ * runtime that does not know it — the device's own clock is used.
+ */
+function wallClock(d: Date, timeZone?: string | null): WallClock {
+  if (timeZone) {
+    try {
+      const parts = new Intl.DateTimeFormat('en-US', {
+        timeZone,
+        year: 'numeric',
+        month: 'numeric',
+        day: 'numeric',
+        weekday: 'short',
+        hour: 'numeric',
+        minute: 'numeric',
+        hourCycle: 'h23',
+      }).formatToParts(d);
+      const part = (type: string) => parts.find((p) => p.type === type)?.value ?? '';
+
+      const clock = {
+        year: parseInt(part('year'), 10),
+        month: parseInt(part('month'), 10) - 1,
+        day: parseInt(part('day'), 10),
+        weekday: DAYS.indexOf(part('weekday')),
+        hours: parseInt(part('hour'), 10) % 24,
+        minutes: parseInt(part('minute'), 10),
+      };
+
+      if (clock.weekday >= 0 && [clock.year, clock.month, clock.day, clock.hours, clock.minutes].every((n) => !Number.isNaN(n))) {
+        return clock;
+      }
+    } catch {
+      // An unknown zone: fall back to the device clock below.
+    }
+  }
+
+  return {
+    year: d.getFullYear(),
+    month: d.getMonth(),
+    day: d.getDate(),
+    weekday: d.getDay(),
+    hours: d.getHours(),
+    minutes: d.getMinutes(),
+  };
+}
+
+/** "8:02 AM" from an ISO timestamp (or "—" when null), on the given zone's clock. */
+export function formatTime(iso: string | null | undefined, timeZone?: string | null): string {
   if (!iso) return '—';
-  const d = new Date(iso);
-  let hours = d.getHours();
-  const minutes = d.getMinutes().toString().padStart(2, '0');
-  const period = hours >= 12 ? 'PM' : 'AM';
-  hours = hours % 12 || 12;
-  return `${hours}:${minutes} ${period}`;
+  const { hours: h, minutes } = wallClock(new Date(iso), timeZone);
+  const period = h >= 12 ? 'PM' : 'AM';
+  const hours = h % 12 || 12;
+  return `${hours}:${minutes.toString().padStart(2, '0')} ${period}`;
 }
 
 /** "8:00 AM" from a clock-face "HH:MM" string. */
@@ -24,9 +72,16 @@ export function formatClock(hhmm: string | null | undefined): string {
   return `${hours}:${(m ?? '00').padStart(2, '0')} ${period}`;
 }
 
-/** "Mon, Jun 15 2026" from a Date. */
-export function formatLongDate(d: Date): string {
-  return `${DAYS[d.getDay()]}, ${MONTHS[d.getMonth()]} ${d.getDate()} ${d.getFullYear()}`;
+/** "Mon, Jun 15 2026" from a Date, on the given zone's calendar. */
+export function formatLongDate(d: Date, timeZone?: string | null): string {
+  const { year, month, day, weekday } = wallClock(d, timeZone);
+  return `${DAYS[weekday]}, ${MONTHS[month]} ${day} ${year}`;
+}
+
+/** Today's "Y-m-d" on the given zone's calendar — the organisation's today, not the phone's. */
+export function todayDateKey(timeZone?: string | null): string {
+  const { year, month, day } = wallClock(new Date(), timeZone);
+  return `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 }
 
 /** "Jun 15, 2026" from an ISO date string ("Y-m-d"). */

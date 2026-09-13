@@ -85,6 +85,9 @@ class HandleInertiaRequests extends Middleware
             'name' => $organization->name,
             'logo_url' => $organization->logo_url,
             'initials' => $organization->initials(),
+            // Times are shown on the organisation's clock, not the viewer's, so a
+            // manager abroad sees the day that is being judged (ADR 0036).
+            'timezone' => $organization->timezone,
         ];
     }
 }

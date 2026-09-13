@@ -27,7 +27,7 @@ working pane beside it is the app's own light surface.
 | Screen | What it asks |
 | --- | --- |
 | Welcome | What the five steps are, and that any of them can wait. |
-| 1 · Company | Display name (required), legal name, logo, contact details, employer registration numbers (folded away — a company registering today may not have them). |
+| 1 · Company | Display name and time zone (both required — the zone starts from the browser's, and is the clock attendance is judged on, ADR 0036), legal name, logo, contact details, employer registration numbers (folded away — a company registering today may not have them). |
 | 2 · Departments | Tick suggested functions, and name any the company has of its own. Nothing is pre-ticked; a department list is genuinely different at every company. |
 | 3 · Leave | Tick kinds of leave and set the days each carries, and define any others whole. The statutory PH entitlements are pre-ticked at the number the law sets. |
 | 4 · Hiring | Pick one process shape (Standard / Fast Track / Executive Search), or draw the company's own stages. Each card shows its actual stages. |

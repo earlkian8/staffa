@@ -5,6 +5,7 @@ import {
     TooltipContent,
     TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { useOrganizationTimeZone } from '@/hooks/use-organization-time-zone';
 import { cn } from '@/lib/utils';
 import {
     formatDuration,
@@ -25,6 +26,7 @@ const LEGEND: (keyof typeof STATUS_LABELS)[] = [
     'incomplete',
     'absent',
     'on_leave',
+    'holiday',
     'day_off',
 ];
 
@@ -151,6 +153,8 @@ function WeekTile({
     cell: WeekCell;
     onPick: (date: string) => void;
 }) {
+    const timeZone = useOrganizationTimeZone();
+
     if (!cell.status) {
         return (
             <div className="p-1">
@@ -161,12 +165,14 @@ function WeekTile({
 
     const worked = cell.worked_minutes > 0;
     const label = worked
-        ? formatTime(cell.first_in_at)
+        ? formatTime(cell.first_in_at, timeZone)
         : cell.status === 'on_leave'
           ? 'Leave'
-          : cell.status === 'absent'
-            ? 'Absent'
-            : '';
+          : cell.status === 'holiday'
+            ? 'Holiday'
+            : cell.status === 'absent'
+              ? 'Absent'
+              : '';
 
     return (
         <div className="p-1">
@@ -192,10 +198,15 @@ function WeekTile({
                     <span className="font-medium">
                         {STATUS_LABELS[cell.status]}
                     </span>
+                    {cell.holiday && (
+                        <span className="text-primary-foreground/80">
+                            {cell.holiday}
+                        </span>
+                    )}
                     {worked && (
                         <span className="text-primary-foreground/80 tabular-nums">
-                            {formatTime(cell.first_in_at)} →{' '}
-                            {formatTime(cell.last_out_at)} ·{' '}
+                            {formatTime(cell.first_in_at, timeZone)} →{' '}
+                            {formatTime(cell.last_out_at, timeZone)} ·{' '}
                             {formatDuration(cell.worked_minutes)}
                         </span>
                     )}

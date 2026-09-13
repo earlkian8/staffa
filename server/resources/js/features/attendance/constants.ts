@@ -3,6 +3,7 @@ import type { LucideIcon } from 'lucide-react';
 import type {
     AttendanceRecord,
     AttendanceStatus,
+    AttendanceTab,
     PunchSource,
     PunchType,
 } from './types';
@@ -17,6 +18,7 @@ export const STATUS_FILTERS = [
     { value: 'undertime', label: 'Undertime' },
     { value: 'absent', label: 'Absent' },
     { value: 'on_leave', label: 'On leave' },
+    { value: 'holiday', label: 'Holiday' },
     { value: 'day_off', label: 'Day off' },
     { value: 'incomplete', label: 'Incomplete' },
 ] as const;
@@ -187,8 +189,12 @@ export function formatDuration(minutes: number): string {
     return mins === 0 ? `${hours}h` : `${hours}h ${mins}m`;
 }
 
-/** Format an ISO timestamp as a local clock time, e.g. "8:05 AM". */
-export function formatTime(iso: string | null): string {
+/**
+ * Format an ISO timestamp as a clock time, e.g. "8:05 AM" — on the given zone's
+ * clock, which for attendance is the organisation's (see
+ * `useOrganizationTimeZone`), not the browser's.
+ */
+export function formatTime(iso: string | null, timeZone?: string): string {
     if (!iso) {
         return '—';
     }
@@ -196,5 +202,78 @@ export function formatTime(iso: string | null): string {
     return new Date(iso).toLocaleTimeString(undefined, {
         hour: 'numeric',
         minute: '2-digit',
+        timeZone,
     });
+}
+
+/** The calendar and clock fields an instant shows in a zone (the browser's when none is given). */
+function zonedParts(date: Date, timeZone?: string) {
+    const parts = new Intl.DateTimeFormat('en-US', {
+        timeZone,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        hourCycle: 'h23',
+    }).formatToParts(date);
+
+    const part = (type: Intl.DateTimeFormatPartTypes) =>
+        parts.find((entry) => entry.type === type)?.value ?? '00';
+
+    return {
+        date: `${part('year')}-${part('month')}-${part('day')}`,
+        time: `${part('hour') === '24' ? '00' : part('hour')}:${part('minute')}`,
+    };
+}
+
+/**
+ * Today's date ("Y-m-d") on a zone's calendar — the organisation's today, which
+ * in the evening in New York is already tomorrow in Manila.
+ */
+export function todayIn(timeZone?: string): string {
+    return zonedParts(new Date(), timeZone).date;
+}
+
+/**
+ * The 24-hour "HH:MM" an instant reads on a zone's clock — what a time input
+ * holds, and what the server reads back as a clock-face time.
+ */
+export function clockReading(iso: string | null, timeZone?: string): string {
+    return iso ? zonedParts(new Date(iso), timeZone).time : '';
+}
+
+/** A calendar date as "Y-m-d" from its local fields (never via UTC). */
+export function toDateKey(date: Date): string {
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+/** The first and last date of the day / week (Mon–Sun) / month a tab shows. */
+export function periodRange(
+    date: string,
+    tab: AttendanceTab,
+): { from: string; to: string } {
+    const anchor = new Date(`${date}T00:00:00`);
+
+    if (tab === 'monthly') {
+        return {
+            from: toDateKey(
+                new Date(anchor.getFullYear(), anchor.getMonth(), 1),
+            ),
+            to: toDateKey(
+                new Date(anchor.getFullYear(), anchor.getMonth() + 1, 0),
+            ),
+        };
+    }
+
+    if (tab === 'weekly') {
+        const start = new Date(anchor);
+        start.setDate(anchor.getDate() - ((anchor.getDay() + 6) % 7));
+        const end = new Date(start);
+        end.setDate(start.getDate() + 6);
+
+        return { from: toDateKey(start), to: toDateKey(end) };
+    }
+
+    return { from: date, to: date };
 }

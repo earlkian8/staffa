@@ -4,8 +4,12 @@ namespace App\Queries;
 
 use App\Models\AttendanceRecord;
 use App\Models\Employee;
+use App\Models\Holiday;
 use App\Models\LeaveRequest;
 use App\Support\Attendance\AttendanceCalculator;
+use App\Support\Attendance\DayRules;
+use App\Support\HolidayCalendar;
+use App\Support\OrganizationClock;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
@@ -18,8 +22,9 @@ use Illuminate\Support\Collection;
  *
  * Like the daily roster, every (filtered) employee appears for every day: a saved
  * {@see AttendanceRecord}'s status + totals where one exists, otherwise a
- * synthesized cell (day_off / on_leave / absent). Days after today carry a null
- * status (nothing has happened yet) so the UI can leave them blank.
+ * synthesized cell (on_leave / holiday / day_off / absent). Days after the
+ * organisation's today carry a null status (nothing has happened yet) so the UI
+ * can leave them blank.
  */
 class AttendanceRangeQuery
 {
@@ -32,7 +37,7 @@ class AttendanceRangeQuery
     {
         $startDate = CarbonImmutable::parse($start)->startOfDay();
         $endDate = CarbonImmutable::parse($end)->startOfDay();
-        $today = CarbonImmutable::today();
+        $today = CarbonImmutable::parse(OrganizationClock::today());
 
         $employees = Employee::query()
             ->with(['department:id,name', 'workSchedule'])
@@ -59,15 +64,18 @@ class AttendanceRangeQuery
             ->get(['employee_id', 'start_date', 'end_date'])
             ->groupBy('employee_id');
 
+        // The window's holidays, loaded once and keyed by date.
+        $holidays = HolidayCalendar::inRange($startDate, $endDate);
+
         return $employees
-            ->map(function (Employee $employee) use ($records, $leaves, $startDate, $endDate, $today): array {
+            ->map(function (Employee $employee) use ($records, $leaves, $holidays, $startDate, $endDate, $today): array {
                 $own = $records->get($employee->id) ?? collect();
                 $ownLeaves = $leaves->get($employee->id) ?? collect();
 
                 $cells = [];
 
                 for ($day = $startDate; $day->lte($endDate); $day = $day->addDay()) {
-                    $cells[] = $this->cell($day, $today, $employee, $own, $ownLeaves);
+                    $cells[] = $this->cell($day, $today, $employee, $own, $ownLeaves, $holidays[$day->format('Y-m-d')] ?? null);
                 }
 
                 return ['employee' => $employee, 'cells' => $cells];
@@ -89,6 +97,7 @@ class AttendanceRangeQuery
         Employee $employee,
         Collection $records,
         Collection $leaves,
+        ?Holiday $holiday,
     ): array {
         $date = $day->format('Y-m-d');
         $isFuture = $day->gt($today);
@@ -105,17 +114,20 @@ class AttendanceRangeQuery
                 'undertime_minutes' => (int) $record->undertime_minutes,
                 'first_in_at' => $record->first_in_at?->toIso8601String(),
                 'last_out_at' => $record->last_out_at?->toIso8601String(),
+                // The holiday the day was judged with, which is not necessarily
+                // the calendar's today (ADR 0036).
+                'holiday' => $record->rules['holiday_name'] ?? null,
                 'hashid' => $record->hashid,
                 'is_future' => false,
             ];
         }
 
-        $status = match (true) {
-            $isFuture => null,
-            $this->onLeave($leaves, $day) => 'on_leave',
-            ! AttendanceCalculator::isWorkingDay($day, $employee->workSchedule) => 'day_off',
-            default => 'absent',
-        };
+        $status = $isFuture
+            ? null
+            : AttendanceCalculator::noPunchStatus(
+                DayRules::fromSchedule($employee->workSchedule, $date, $holiday),
+                $this->onLeave($leaves, $day),
+            );
 
         return [
             'date' => $date,
@@ -126,6 +138,7 @@ class AttendanceRangeQuery
             'undertime_minutes' => 0,
             'first_in_at' => null,
             'last_out_at' => null,
+            'holiday' => $holiday?->name,
             'hashid' => null,
             'is_future' => $isFuture,
         ];

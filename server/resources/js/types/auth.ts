@@ -24,6 +24,8 @@ export type Organization = {
     name: string;
     logo_url: string | null;
     initials: string;
+    /** The IANA zone attendance is judged and shown on, e.g. "Asia/Manila". */
+    timezone: string;
 };
 
 export type Auth = {

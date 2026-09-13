@@ -50,6 +50,7 @@ class AttendanceMonthlyReport
         $present = 0;
         $late = 0;
         $absent = 0;
+        $holidays = 0;
         $scheduled = 0;
         $overtimeMinutes = 0;
         $workedMinutes = 0;
@@ -69,6 +70,10 @@ class AttendanceMonthlyReport
             } elseif ($status === 'absent') {
                 $absent++;
                 $scheduled++;
+            } elseif ($status === 'holiday') {
+                // Nobody was expected: a holiday is neither attendance nor absence,
+                // so it stays out of the rate.
+                $holidays++;
             }
 
             if ($status === 'late') {
@@ -97,6 +102,7 @@ class AttendanceMonthlyReport
             'present_days' => $present,
             'late_count' => $late,
             'absent_count' => $absent,
+            'holiday_count' => $holidays,
             'overtime_hours' => round($overtimeMinutes / 60, 1),
             'worked_hours' => round($workedMinutes / 60, 1),
             'attendance_rate' => $scheduled > 0 ? (int) round($present / $scheduled * 100) : null,

@@ -39,7 +39,7 @@ function greeting(): string {
 
 export default function HomeScreen() {
   const { colors, spacing, readable } = useTheme();
-  const { user } = useAuth();
+  const { user, organization } = useAuth();
   const router = useRouter();
   const [switcherOpen, setSwitcherOpen] = useState(false);
 
@@ -124,7 +124,7 @@ export default function HomeScreen() {
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <View style={{ flex: 1, gap: 2 }}>
                 <AppText variant="overline" faint>
-                  {formatLongDate(new Date())}
+                  {formatLongDate(new Date(), organization?.timezone)}
                 </AppText>
                 <AppText variant="title">
                   {record?.first_in_at ? (record.last_out_at ? 'Day complete' : 'You’re clocked in') : 'Not clocked in'}
@@ -153,7 +153,7 @@ export default function HomeScreen() {
                     Time In
                   </AppText>
                   <AppText variant="heading" style={{ fontVariant: ['tabular-nums'] }}>
-                    {formatTime(record?.first_in_at)}
+                    {formatTime(record?.first_in_at, organization?.timezone)}
                   </AppText>
                 </View>
                 <View>

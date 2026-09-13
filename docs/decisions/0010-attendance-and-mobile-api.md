@@ -1,6 +1,7 @@
 # 0010 — Attendance (DTR): a punch-event model and a token API for mobile
 
-- **Status:** Accepted
+- **Status:** Accepted — the "Computation against the schedule" paragraph is superseded by
+  [0036 — Attendance is judged in the organisation's local time](./0036-attendance-judged-in-local-time-on-shift-anchored-dates.md)
 - **Date:** 2026-06-15
 - **Related:** [Attendance module](../modules/attendance.md),
   [attendance tables](../database/attendance-tables.md), [ERD](../database/erd.md),

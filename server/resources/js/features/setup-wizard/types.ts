@@ -1,3 +1,4 @@
+import type { TimezoneOption } from '@/components/timezone-select';
 import type { CompanyProfile } from '@/features/company-profile/types';
 import type {
     BandTone,
@@ -111,6 +112,8 @@ export type ExistingConfiguration = {
 
 export type SetupWizardPageProps = {
     company: CompanyProfile;
+    /** Every zone step one can offer. */
+    timezones: TimezoneOption[];
     progress: SetupProgress;
     blueprints: {
         departments: DepartmentBlueprint[];

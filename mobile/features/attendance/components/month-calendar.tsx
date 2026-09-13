@@ -1,6 +1,8 @@
 import { Pressable, View } from 'react-native';
 
 import { AppText } from '@/components/ui/text';
+import { useAuth } from '@/lib/auth';
+import { todayDateKey } from '@/lib/format';
 import { attendanceMeta } from '@/lib/status';
 import { useTheme } from '@/theme/theme';
 import type { AttendanceStatus } from '@/types/api';
@@ -20,15 +22,14 @@ function toKey(year: number, month: number, day: number): string {
 /** A month grid with a status dot under each recorded day. */
 export function MonthCalendar({ month, byDate, onSelectDay }: MonthCalendarProps) {
   const { colors, readable } = useTheme();
+  const { organization } = useAuth();
 
   const year = month.getFullYear();
   const m = month.getMonth();
   const firstWeekday = new Date(year, m, 1).getDay();
   const daysInMonth = new Date(year, m + 1, 0).getDate();
-  const todayKey = (() => {
-    const t = new Date();
-    return toKey(t.getFullYear(), t.getMonth(), t.getDate());
-  })();
+  // Today is the organisation's date, the day attendance is being recorded under.
+  const todayKey = todayDateKey(organization?.timezone);
 
   const cells: (number | null)[] = [
     ...Array.from({ length: firstWeekday }, () => null),

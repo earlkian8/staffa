@@ -2,6 +2,7 @@ import { ChevronRight, Clock, LogOut, ShieldCheck, UserX } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useMemo } from 'react';
 import { PersonAvatar } from '@/components/person-avatar';
+import { useOrganizationTimeZone } from '@/hooks/use-organization-time-zone';
 import { cn } from '@/lib/utils';
 import {
     formatDuration,
@@ -36,6 +37,8 @@ export function ExceptionsPanel({
     onResolve: (record: AttendanceRecord) => void;
     onOpen: (record: AttendanceRecord) => void;
 }) {
+    const timeZone = useOrganizationTimeZone();
+
     const groups = useMemo<Group[]>(() => {
         const missingOut = records.filter((r) => r.status === 'incomplete');
         const veryLate = records
@@ -52,7 +55,7 @@ export function ExceptionsPanel({
                 records: missingOut,
                 detail: (r: AttendanceRecord) =>
                     r.first_in_at
-                        ? `In at ${formatTime(r.first_in_at)} · never clocked out`
+                        ? `In at ${formatTime(r.first_in_at, timeZone)} · never clocked out`
                         : 'Never clocked out',
             },
             {
@@ -73,7 +76,7 @@ export function ExceptionsPanel({
                 detail: () => 'No punches · not on leave',
             },
         ].filter((group) => group.records.length > 0);
-    }, [records]);
+    }, [records, timeZone]);
 
     const total = groups.reduce((sum, group) => sum + group.records.length, 0);
 

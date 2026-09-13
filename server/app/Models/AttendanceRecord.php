@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Models\Concerns\BelongsToOrganization;
 use App\Models\Concerns\HasHashid;
 use App\Support\Attendance\AttendanceCalculator;
+use App\Support\Attendance\DayRules;
 use Database\Factories\AttendanceRecordFactory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -17,6 +18,10 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * its {@see AttendancePunch} events. Status and the minute totals are derived
  * server-side (see {@see AttendanceCalculator}); they are
  * never trusted from the client.
+ *
+ * The day carries what it is judged against (ADR 0036): the shift as instants
+ * (`scheduled_start_at` / `scheduled_end_at`, worked out in the organisation's
+ * zone) and the {@see DayRules} frozen when it opened (`rules`).
  */
 class AttendanceRecord extends Model
 {
@@ -37,6 +42,9 @@ class AttendanceRecord extends Model
         'work_schedule_id',
         'scheduled_start',
         'scheduled_end',
+        'scheduled_start_at',
+        'scheduled_end_at',
+        'rules',
         'status',
         'first_in_at',
         'last_out_at',
@@ -56,6 +64,9 @@ class AttendanceRecord extends Model
     {
         return [
             'work_date' => 'date',
+            'scheduled_start_at' => 'datetime',
+            'scheduled_end_at' => 'datetime',
+            'rules' => 'array',
             'first_in_at' => 'datetime',
             'last_out_at' => 'datetime',
             'worked_minutes' => 'integer',

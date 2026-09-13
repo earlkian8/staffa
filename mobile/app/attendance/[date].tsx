@@ -11,6 +11,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { AppText } from '@/components/ui/text';
 import { attendanceApi } from '@/features/attendance/api';
 import { PUNCH_META, PUNCH_TIMELINE_LABEL } from '@/features/attendance/punch-meta';
+import { useAuth } from '@/lib/auth';
 import { formatClock, formatDate, formatMinutes, formatTime } from '@/lib/format';
 import { attendanceMeta } from '@/lib/status';
 import { useQuery } from '@/lib/use-query';
@@ -20,6 +21,7 @@ import type { Paginated, AttendanceRecord } from '@/types/api';
 export default function AttendanceDayScreen() {
   const { colors, spacing } = useTheme();
   const { date } = useLocalSearchParams<{ date: string }>();
+  const { organization } = useAuth();
 
   const { data, loading } = useQuery<Paginated<AttendanceRecord>>(
     () => attendanceApi.records(date, date),
@@ -104,7 +106,7 @@ export default function AttendanceDayScreen() {
                         )}
                       </View>
                       <AppText variant="label" muted style={{ fontVariant: ['tabular-nums'] }}>
-                        {formatTime(punch.punched_at)}
+                        {formatTime(punch.punched_at, organization?.timezone)}
                       </AppText>
                     </View>
                   ))}

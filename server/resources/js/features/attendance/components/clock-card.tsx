@@ -2,6 +2,7 @@ import { Camera, Clock, MapPin, X } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
+import { useOrganizationTimeZone } from '@/hooks/use-organization-time-zone';
 import { cn } from '@/lib/utils';
 import { punch } from '../api';
 import { formatDuration, PUNCH_META } from '../constants';
@@ -33,6 +34,7 @@ export function ClockCard({
     canClock,
 }: Props) {
     const now = useNow();
+    const timeZone = useOrganizationTimeZone();
     const [processing, setProcessing] = useState<PunchType | null>(null);
     const [selfie, setSelfie] = useState<File | null>(null);
     const fileRef = useRef<HTMLInputElement>(null);
@@ -59,15 +61,19 @@ export function ClockCard({
         });
     };
 
+    // The punch clock on the office wall: the organisation's time, wherever
+    // this browser happens to be.
     const time = now.toLocaleTimeString(undefined, {
         hour: 'numeric',
         minute: '2-digit',
         second: '2-digit',
+        timeZone,
     });
     const date = now.toLocaleDateString(undefined, {
         weekday: 'long',
         month: 'long',
         day: 'numeric',
+        timeZone,
     });
 
     return (

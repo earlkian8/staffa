@@ -3,6 +3,7 @@
 namespace App\Queries;
 
 use App\Models\Employee;
+use App\Support\OrganizationClock;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 
@@ -22,7 +23,7 @@ class AttendanceWeeklyQuery
     {
         $start = CarbonImmutable::parse($anchor)->startOfWeek(CarbonInterface::MONDAY);
         $end = $start->addDays(6);
-        $today = CarbonImmutable::today();
+        $today = CarbonImmutable::parse(OrganizationClock::today());
 
         $days = [];
 

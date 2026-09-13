@@ -17,6 +17,7 @@ Soft-deletes.
 | `legal_name` | string, nullable | |
 | `logo` | string, nullable | Stored on the `public` disk; exposed as `logo_url`. |
 | `email` / `phone` / `address` | string/text, nullable | |
+| `timezone` | string(64), default `Asia/Manila` | IANA zone attendance is judged on — see [ADR 0036](../decisions/0036-attendance-judged-in-local-time-on-shift-anchored-dates.md). Existing organisations were back-filled by the default. |
 | `tin` / `sss_employer_no` / `philhealth_employer_no` / `pagibig_employer_no` | string, nullable | Employer government IDs. |
 | `join_code` / `join_code_enabled` | string / boolean | The code people type to ask to join (ADR 0026). A credential, so not `$fillable`. |
 | `setup_completed_at` | timestamp, nullable | Null means guided setup is still owed — see [ADR 0032](../decisions/0032-guided-company-setup.md). Organisations that predate the wizard were back-filled as complete. |

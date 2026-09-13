@@ -1,5 +1,5 @@
 import { Head, Link, router, usePage } from '@inertiajs/react';
-import { CalendarCheck, CheckCheck, UserRound } from 'lucide-react';
+import { CalendarCheck, CheckCheck, RefreshCw, UserRound } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { Button } from '@/components/ui/button';
@@ -12,6 +12,7 @@ import { MonthlyReportTable } from '@/features/attendance/components/monthly-rep
 import { RecordDetailDialog } from '@/features/attendance/components/record-detail-dialog';
 import { TodayLogTable } from '@/features/attendance/components/today-log-table';
 import { WeeklyGrid } from '@/features/attendance/components/weekly-grid';
+import { periodRange } from '@/features/attendance/constants';
 import { useAttendanceFilters } from '@/features/attendance/hooks/use-attendance-filters';
 import { attendanceRoutes } from '@/features/attendance/routes';
 import type {
@@ -36,6 +37,13 @@ export default function AttendanceIndex() {
 
     const [approveOpen, setApproveOpen] = useState(false);
     const [approving, setApproving] = useState(false);
+
+    const [reapplyOpen, setReapplyOpen] = useState(false);
+    const [reapplying, setReapplying] = useState(false);
+
+    // The period on screen — the day, the week or the month — is what a bulk
+    // re-apply covers.
+    const period = periodRange(filters.date, filters.tab);
 
     // A GET download that mirrors the on-screen tab and its active filters.
     const exportUrl = useMemo(() => {
@@ -96,6 +104,36 @@ export default function AttendanceIndex() {
         );
     };
 
+    const reapply = (record: AttendanceRecord) => {
+        if (!record.hashid) {
+            return;
+        }
+
+        router.patch(
+            attendanceRoutes.reapply(record.hashid),
+            {},
+            { preserveScroll: true, onSuccess: () => setDetailOpen(false) },
+        );
+    };
+
+    const reapplyPeriod = () =>
+        router.patch(
+            attendanceRoutes.reapplyRange,
+            {
+                from: period.from,
+                to: period.to,
+                department: filters.department,
+            },
+            {
+                preserveScroll: true,
+                onStart: () => setReapplying(true),
+                onFinish: () => {
+                    setReapplying(false);
+                    setReapplyOpen(false);
+                },
+            },
+        );
+
     const askDelete = (record: AttendanceRecord) => {
         setDetail(record);
         setConfirmOpen(true);
@@ -145,6 +183,16 @@ export default function AttendanceIndex() {
                                     {stats.pending}
                                 </span>{' '}
                                 pending
+                            </Button>
+                        )}
+                        {can.manage && (
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setReapplyOpen(true)}
+                            >
+                                <RefreshCw className="size-4" />
+                                Re-apply schedules
                             </Button>
                         )}
                         <Button variant="outline" size="sm" asChild>
@@ -205,6 +253,7 @@ export default function AttendanceIndex() {
                 onOpenChange={setDetailOpen}
                 onEdit={openManual}
                 onApprove={approve}
+                onReapply={reapply}
                 onDelete={askDelete}
             />
 
@@ -235,8 +284,40 @@ export default function AttendanceIndex() {
                 processing={approving}
                 onConfirm={approveAllPending}
             />
+
+            <ConfirmDialog
+                open={reapplyOpen}
+                onOpenChange={setReapplyOpen}
+                title={`Re-apply current schedules to ${periodText(period.from, period.to)}?`}
+                description={
+                    <>
+                        Every recorded day in this period
+                        {filters.department
+                            ? ' for the selected department'
+                            : ''}{' '}
+                        is judged again by each employee&apos;s current schedule
+                        and the holiday calendar. Punches stay as they are;
+                        lateness, overtime and status can change. Until you do
+                        this, a day keeps the rules it was recorded with.
+                    </>
+                }
+                confirmLabel="Re-apply"
+                processing={reapplying}
+                onConfirm={reapplyPeriod}
+            />
         </>
     );
+}
+
+/** "Sep 14" or "Sep 8 – Sep 14". */
+function periodText(from: string, to: string): string {
+    const format = (date: string) =>
+        new Date(`${date}T00:00:00`).toLocaleDateString(undefined, {
+            month: 'short',
+            day: 'numeric',
+        });
+
+    return from === to ? format(from) : `${format(from)} – ${format(to)}`;
 }
 
 function TodayTab({

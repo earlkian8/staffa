@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Models\Concerns\BelongsToOrganization;
 use App\Support\JoinCode;
+use App\Support\OrganizationClock;
 use App\Support\Setup\CompanySetup;
 use Database\Factories\OrganizationFactory;
 use Illuminate\Database\Eloquent\Casts\Attribute;
@@ -37,6 +38,7 @@ class Organization extends Model
         'email',
         'phone',
         'address',
+        'timezone',
         'tin',
         'sss_employer_no',
         'philhealth_employer_no',
@@ -49,12 +51,16 @@ class Organization extends Model
     protected $appends = ['logo_url'];
 
     /**
-     * Mirrors the column default so a freshly-made instance answers the same as one
-     * read back from the database.
+     * Mirrors the column defaults so a freshly-made instance answers the same as one
+     * read back from the database. `timezone` is the clock attendance is judged on
+     * — see {@see OrganizationClock}.
      *
      * @var array<string, mixed>
      */
-    protected $attributes = ['join_code_enabled' => true];
+    protected $attributes = [
+        'join_code_enabled' => true,
+        'timezone' => OrganizationClock::DEFAULT_TIMEZONE,
+    ];
 
     /**
      * `join_code` is deliberately absent from {@see $fillable}: it is a credential,

@@ -4,9 +4,13 @@ namespace Database\Seeders;
 
 use App\Models\AttendanceRecord;
 use App\Models\Employee;
+use App\Models\Holiday;
 use App\Models\Organization;
+use App\Models\WorkSchedule;
 use App\Support\Attendance\AttendanceCalculator;
 use App\Support\Attendance\AttendanceClock;
+use App\Support\HolidayCalendar;
+use App\Support\OrganizationClock;
 use App\Support\Tenancy;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Seeder;
@@ -18,10 +22,13 @@ use Illuminate\Database\Seeder;
  * — the chronically late, the occasional no-show, the overtime grinder — emerge
  * across the week and month rather than looking uniformly random.
  *
- * Punches are written through the canonical {@see AttendanceClock}/{@see
- * AttendanceCalculator}, so seeded totals and statuses are computed exactly as a
- * live punch would be. Absent days are simply left empty (the roster synthesises
- * them), matching production.
+ * Punches are real instants on the organisation's clock ({@see OrganizationClock}):
+ * a Day Shift clock-in at 07:52 Manila is stored as 23:52Z the evening before,
+ * and a Night Shift runs 22:00 into the next morning on one record, exactly as a
+ * live punch would. Totals and statuses come from the canonical {@see AttendanceClock}
+ * / {@see AttendanceCalculator}. Absent days, rest days and non-working holidays
+ * are simply left empty (the roster synthesises them), matching production, and
+ * today is only seeded as far as it has happened.
  */
 class AttendanceSeeder extends Seeder
 {
@@ -48,15 +55,20 @@ class AttendanceSeeder extends Seeder
         }
 
         $clock = app(AttendanceClock::class);
-        $today = CarbonImmutable::today();
+        $now = CarbonImmutable::now();
+        $today = CarbonImmutable::parse(OrganizationClock::today());
         $start = $today->subDays(self::DAYS);
+        $holidays = HolidayCalendar::inRange($start, $today);
 
-        Employee::with('workSchedule')->each(function (Employee $employee) use ($clock, $start, $today): void {
+        Employee::with('workSchedule')->each(function (Employee $employee) use ($clock, $start, $today, $now, $holidays): void {
             $schedule = $employee->workSchedule;
             $profile = $this->profile();
 
             for ($day = $start; $day->lte($today); $day = $day->addDay()) {
-                if (! AttendanceCalculator::isWorkingDay($day, $schedule)) {
+                $holiday = $holidays[$day->toDateString()] ?? null;
+
+                if (! AttendanceCalculator::isWorkingDay($day, $schedule)
+                    || ($holiday !== null && in_array($holiday->type, Holiday::NON_WORKING_TYPES, true))) {
                     continue;
                 }
 
@@ -66,7 +78,7 @@ class AttendanceSeeder extends Seeder
                     continue;
                 }
 
-                $this->seedDay($clock, $employee, $schedule?->start_time, $schedule?->end_time, (int) ($schedule?->grace_minutes ?? 0), $day, $scenario);
+                $this->seedDay($clock, $employee, $schedule, $day->toDateString(), $scenario, $now);
             }
         });
     }
@@ -120,14 +132,15 @@ class AttendanceSeeder extends Seeder
     private function seedDay(
         AttendanceClock $clock,
         Employee $employee,
-        ?string $startTime,
-        ?string $endTime,
-        int $grace,
-        CarbonImmutable $day,
+        ?WorkSchedule $schedule,
+        string $date,
         string $scenario,
+        CarbonImmutable $now,
     ): void {
-        $startAt = $day->setTimeFromTimeString($startTime ?: '09:00:00');
-        $endAt = $day->setTimeFromTimeString($endTime ?: '18:00:00');
+        // The shift as instants on the organisation's clock; a night shift's end
+        // is the next morning.
+        [$startAt, $endAt] = AttendanceClock::shiftInstants($date, $schedule?->start_time ?: '09:00', $schedule?->end_time ?: '18:00');
+        $grace = (int) ($schedule?->grace_minutes ?? 0);
 
         $clockIn = $scenario === 'late'
             ? $startAt->addMinutes($grace + random_int(8, 55))
@@ -140,29 +153,41 @@ class AttendanceSeeder extends Seeder
             default => $endAt->addMinutes(random_int(1, 14)),
         };
 
-        $record = $clock->openRecord($employee, $day->toDateString());
-        $source = random_int(1, 100) <= 35 ? 'mobile' : 'web';
+        // A meal break around the middle of the shift, whenever the shift is.
+        $halfShift = intdiv($endAt->getTimestamp() - $startAt->getTimestamp(), 120);
+        $breakStart = $startAt->addMinutes($halfShift - 30 + random_int(-20, 25));
+        $breakEnd = $breakStart->addMinutes(random_int(40, 75));
 
-        $this->punch($record, $employee, 'clock_in', $clockIn, $source);
-
-        if ($scenario !== 'incomplete') {
-            // A lunch break around mid-shift.
-            $breakStart = $day->setTimeFromTimeString('12:00:00')->addMinutes(random_int(-20, 25));
-            $this->punch($record, $employee, 'break_start', $breakStart, $source);
-            $this->punch($record, $employee, 'break_end', $breakStart->addMinutes(random_int(40, 75)), $source);
-            $this->punch($record, $employee, 'clock_out', $clockOut, $source);
+        // Nothing is seeded that has not happened yet: a shift still under way
+        // today stops at its last punch so far.
+        if ($clockIn->gt($now)) {
+            return;
         }
 
-        $clock->refresh($record, $employee);
-    }
+        $punches = [['clock_in', $clockIn]];
 
-    private function punch(AttendanceRecord $record, Employee $employee, string $type, CarbonImmutable $at, string $source): void
-    {
-        $record->punches()->create([
-            'employee_id' => $employee->id,
-            'type' => $type,
-            'punched_at' => $at,
-            'source' => $source,
-        ]);
+        if ($scenario !== 'incomplete') {
+            foreach ([['break_start', $breakStart], ['break_end', $breakEnd], ['clock_out', $clockOut]] as $punch) {
+                if ($punch[1]->gt($now)) {
+                    break;
+                }
+
+                $punches[] = $punch;
+            }
+        }
+
+        $record = $clock->openRecord($employee, $date);
+        $source = random_int(1, 100) <= 35 ? 'mobile' : 'web';
+
+        foreach ($punches as [$type, $at]) {
+            $record->punches()->create([
+                'employee_id' => $employee->id,
+                'type' => $type,
+                'punched_at' => $at,
+                'source' => $source,
+            ]);
+        }
+
+        $clock->refresh($record);
     }
 }

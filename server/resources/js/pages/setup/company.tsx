@@ -1,8 +1,16 @@
 import { Head, useForm, usePage } from '@inertiajs/react';
-import { Building2, Contact, Landmark, Trash2, Upload } from 'lucide-react';
+import {
+    Building2,
+    Clock,
+    Contact,
+    Landmark,
+    Trash2,
+    Upload,
+} from 'lucide-react';
 import { useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import InputError from '@/components/input-error';
+import { browserTimeZone, TimezoneSelect } from '@/components/timezone-select';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -11,7 +19,8 @@ import { companyProfileRoutes } from '@/features/company-profile/routes';
 import type { CompanyProfilePageProps } from '@/features/company-profile/types';
 
 export default function CompanyProfilePage() {
-    const { company, can } = usePage<CompanyProfilePageProps>().props;
+    const { company, timezones, can } =
+        usePage<CompanyProfilePageProps>().props;
     const readOnly = !can.manage;
 
     const { data, setData, post, processing, errors, isDirty, transform } =
@@ -21,6 +30,7 @@ export default function CompanyProfilePage() {
             email: company.email ?? '',
             phone: company.phone ?? '',
             address: company.address ?? '',
+            timezone: company.timezone,
             tin: company.tin ?? '',
             sss_employer_no: company.sss_employer_no ?? '',
             philhealth_employer_no: company.philhealth_employer_no ?? '',
@@ -63,6 +73,10 @@ export default function CompanyProfilePage() {
     };
 
     const logoChanged = data.logo !== null || data.remove_logo;
+    const detectedZone = browserTimeZone(timezones);
+    const detectedLabel =
+        timezones.find((zone) => zone.value === detectedZone)?.label ??
+        detectedZone;
 
     const submit = (event: React.FormEvent) => {
         event.preventDefault();
@@ -243,6 +257,39 @@ export default function CompanyProfilePage() {
                             </Field>
                         </div>
                     </div>
+                </Section>
+
+                {/* The clock attendance is judged on (ADR 0036) */}
+                <Section
+                    icon={<Clock className="size-4" />}
+                    title="Time zone"
+                    description="The clock attendance is judged on — who was late, what “today” is, and which day a night shift belongs to."
+                >
+                    <Field label="Time zone" required error={errors.timezone}>
+                        <TimezoneSelect
+                            value={data.timezone}
+                            options={timezones}
+                            onChange={(zone) => setData('timezone', zone)}
+                            disabled={readOnly}
+                            invalid={Boolean(errors.timezone)}
+                        />
+                    </Field>
+                    {!readOnly &&
+                        detectedZone &&
+                        detectedZone !== data.timezone && (
+                            <p className="mt-2 text-xs text-muted-foreground">
+                                This browser is set to {detectedLabel}.{' '}
+                                <button
+                                    type="button"
+                                    onClick={() =>
+                                        setData('timezone', detectedZone)
+                                    }
+                                    className="font-medium text-foreground underline-offset-2 hover:underline"
+                                >
+                                    Use it
+                                </button>
+                            </p>
+                        )}
                 </Section>
 
                 {/* Statutory employer numbers */}

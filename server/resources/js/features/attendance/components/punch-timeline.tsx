@@ -1,5 +1,6 @@
 import { CameraOff, ImageOff, MapPin, StickyNote } from 'lucide-react';
 import { useState } from 'react';
+import { useOrganizationTimeZone } from '@/hooks/use-organization-time-zone';
 import { cn } from '@/lib/utils';
 import { formatTime, PUNCH_META, SOURCE_LABELS } from '../constants';
 import type { Punch } from '../types';
@@ -39,6 +40,7 @@ export function PunchTimeline({ punches }: { punches: Punch[] }) {
 
 /** One punch: what happened and when, where it came from, and the proof. */
 function PunchRow({ punch }: { punch: Punch }) {
+    const timeZone = useOrganizationTimeZone();
     const meta = PUNCH_META[punch.type];
     const Icon = meta.icon;
     const hasGeo = punch.latitude !== null && punch.longitude !== null;
@@ -58,7 +60,7 @@ function PunchRow({ punch }: { punch: Punch }) {
                 <p className="text-sm font-medium">
                     {meta.label}
                     <span className="ml-2 text-xs font-normal text-muted-foreground tabular-nums">
-                        {formatTime(punch.punched_at)}
+                        {formatTime(punch.punched_at, timeZone)}
                     </span>
                 </p>
 

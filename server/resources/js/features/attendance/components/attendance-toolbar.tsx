@@ -16,7 +16,8 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { STATUS_FILTERS } from '../constants';
+import { useOrganizationTimeZone } from '@/hooks/use-organization-time-zone';
+import { STATUS_FILTERS, toDateKey, todayIn } from '../constants';
 import type { AttendanceFilters, AttendanceTab, DepartmentRef } from '../types';
 
 type Props = {
@@ -31,10 +32,6 @@ type Props = {
     onManualEntry: () => void;
 };
 
-function toIso(d: Date): string {
-    return d.toISOString().slice(0, 10);
-}
-
 /** Shift the anchor date by one period (day / week / month) in either direction. */
 function shiftPeriod(date: string, tab: AttendanceTab, dir: 1 | -1): string {
     const d = new Date(`${date}T00:00:00`);
@@ -48,7 +45,7 @@ function shiftPeriod(date: string, tab: AttendanceTab, dir: 1 | -1): string {
         d.setDate(d.getDate() + dir);
     }
 
-    return toIso(d);
+    return toDateKey(d);
 }
 
 /** The Monday that opens the week containing `date`. */
@@ -57,7 +54,7 @@ function weekStart(date: string): string {
     const offset = (d.getDay() + 6) % 7;
     d.setDate(d.getDate() - offset);
 
-    return toIso(d);
+    return toDateKey(d);
 }
 
 /** Whether the displayed period already contains (or is after) today. */
@@ -78,7 +75,7 @@ function shortDate(d: Date): string {
 }
 
 /** The period label shown between the steppers, tuned per tab. */
-function periodLabel(date: string, tab: AttendanceTab): string {
+function periodLabel(date: string, tab: AttendanceTab, today: string): string {
     if (tab === 'monthly') {
         return new Date(`${date}T00:00:00`).toLocaleDateString(undefined, {
             month: 'long',
@@ -94,7 +91,6 @@ function periodLabel(date: string, tab: AttendanceTab): string {
         return `${shortDate(start)} – ${shortDate(end)}`;
     }
 
-    const today = toIso(new Date());
     const yesterday = shiftPeriod(today, 'today', -1);
 
     if (date === today) {
@@ -132,7 +128,8 @@ export function AttendanceToolbar({
 }: Props) {
     const [term, setTerm] = useState(filters.search);
     const [syncedSearch, setSyncedSearch] = useState(filters.search);
-    const today = toIso(new Date());
+    // "Today" is the organisation's, the same day the board opens on.
+    const today = todayIn(useOrganizationTimeZone());
     const latest = atLatest(filters.date, filters.tab, today);
 
     if (filters.search !== syncedSearch) {
@@ -173,7 +170,7 @@ export function AttendanceToolbar({
                             className="flex h-9 min-w-[9.5rem] cursor-pointer items-center justify-center rounded-md border border-input bg-card px-3 text-sm font-medium shadow-xs transition-colors hover:bg-accent"
                             htmlFor="attendance-date"
                         >
-                            {periodLabel(filters.date, filters.tab)}
+                            {periodLabel(filters.date, filters.tab, today)}
                         </label>
                         <input
                             id="attendance-date"

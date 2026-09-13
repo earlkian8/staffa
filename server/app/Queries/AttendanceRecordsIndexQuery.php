@@ -4,12 +4,17 @@ namespace App\Queries;
 
 use App\Models\AttendanceRecord;
 use App\Models\Employee;
+use App\Models\Holiday;
 use App\Models\LeaveRequest;
 use App\Support\Attendance\AttendanceCalculator;
+use App\Support\Attendance\AttendanceClock;
+use App\Support\Attendance\DayRules;
+use App\Support\HolidayCalendar;
+use App\Support\OrganizationClock;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\Request;
-use Illuminate\Support\Carbon;
 
 class AttendanceRecordsIndexQuery
 {
@@ -18,7 +23,7 @@ class AttendanceRecordsIndexQuery
      *
      * @var list<string>
      */
-    public const STATUSES = ['all', 'present', 'late', 'undertime', 'absent', 'on_leave', 'day_off', 'incomplete'];
+    public const STATUSES = ['all', 'present', 'late', 'undertime', 'absent', 'on_leave', 'holiday', 'day_off', 'incomplete'];
 
     /**
      * The day's roster after applying the request's status filter.
@@ -44,8 +49,9 @@ class AttendanceRecordsIndexQuery
 
     /**
      * Build the full daily roster: every (matching) employee paired with their
-     * record for the date, synthesising a transient record (day_off / on_leave /
-     * absent) for those who have none, so the board always shows the whole team.
+     * record for the date, synthesising a transient record (on_leave / holiday /
+     * day_off / absent) for those who have none, so the board always shows the
+     * whole team.
      *
      * @return Collection<int, AttendanceRecord>
      */
@@ -72,9 +78,12 @@ class AttendanceRecordsIndexQuery
             ->pluck('employee_id')
             ->flip();
 
+        // Once for the day, not once per person.
+        $holiday = HolidayCalendar::on($date);
+
         return $employees
-            ->map(function (Employee $employee) use ($records, $date, $onLeave): AttendanceRecord {
-                $record = $records->get($employee->id) ?? $this->synthesize($employee, $date, $onLeave->has($employee->id));
+            ->map(function (Employee $employee) use ($records, $date, $onLeave, $holiday): AttendanceRecord {
+                $record = $records->get($employee->id) ?? $this->synthesize($employee, $date, $onLeave->has($employee->id), $holiday);
                 $record->setRelation('employee', $employee);
 
                 return $record;
@@ -83,18 +92,15 @@ class AttendanceRecordsIndexQuery
     }
 
     /**
-     * A transient (unsaved) record for an employee with no punches on the date.
+     * A transient (unsaved) record for an employee with no punches on the date,
+     * carrying the rules a real record would have frozen, and the status those
+     * rules give a day without punches.
      */
-    private function synthesize(Employee $employee, string $date, bool $onLeave): AttendanceRecord
+    private function synthesize(Employee $employee, string $date, bool $onLeave, ?Holiday $holiday): AttendanceRecord
     {
-        $day = Carbon::parse($date);
         $schedule = $employee->workSchedule;
-
-        $status = match (true) {
-            $onLeave => 'on_leave',
-            ! AttendanceCalculator::isWorkingDay($day, $schedule) => 'day_off',
-            default => 'absent',
-        };
+        $rules = DayRules::fromSchedule($schedule, $date, $holiday);
+        [$start, $end] = AttendanceClock::shiftInstants($date, $schedule?->start_time, $schedule?->end_time);
 
         $record = new AttendanceRecord([
             'employee_id' => $employee->id,
@@ -102,7 +108,10 @@ class AttendanceRecordsIndexQuery
             'work_schedule_id' => $schedule?->id,
             'scheduled_start' => $schedule?->start_time,
             'scheduled_end' => $schedule?->end_time,
-            'status' => $status,
+            'scheduled_start_at' => $start,
+            'scheduled_end_at' => $end,
+            'rules' => $rules->toArray(),
+            'status' => AttendanceCalculator::noPunchStatus($rules, $onLeave),
         ]);
 
         $record->setRelation('punches', new Collection);
@@ -117,14 +126,17 @@ class AttendanceRecordsIndexQuery
         return in_array($status, self::STATUSES, true) ? $status : 'all';
     }
 
+    /**
+     * The board's date: the one asked for, or the organisation's today.
+     */
     public function date(Request $request): string
     {
         $raw = $request->string('date')->toString();
 
         try {
-            return $raw !== '' ? Carbon::parse($raw)->toDateString() : Carbon::today()->toDateString();
+            return $raw !== '' ? CarbonImmutable::parse($raw)->toDateString() : OrganizationClock::today();
         } catch (\Throwable) {
-            return Carbon::today()->toDateString();
+            return OrganizationClock::today();
         }
     }
 }

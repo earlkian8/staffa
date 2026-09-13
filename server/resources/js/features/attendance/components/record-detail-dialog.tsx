@@ -1,4 +1,10 @@
-import { BadgeCheck, CircleDashed, Pencil, Trash2 } from 'lucide-react';
+import {
+    BadgeCheck,
+    CircleDashed,
+    Pencil,
+    RefreshCw,
+    Trash2,
+} from 'lucide-react';
 import { useEffect, useState } from 'react';
 import {
     Modal,
@@ -23,6 +29,7 @@ type Props = {
     onOpenChange: (open: boolean) => void;
     onEdit: (record: AttendanceRecord) => void;
     onApprove: (record: AttendanceRecord) => void;
+    onReapply: (record: AttendanceRecord) => void;
     onDelete: (record: AttendanceRecord) => void;
 };
 
@@ -46,6 +53,7 @@ export function RecordDetailDialog({
     onOpenChange,
     onEdit,
     onApprove,
+    onReapply,
     onDelete,
 }: Props) {
     if (!record) {
@@ -61,6 +69,7 @@ export function RecordDetailDialog({
                     canManage={canManage}
                     onEdit={onEdit}
                     onApprove={onApprove}
+                    onReapply={onReapply}
                     onDelete={onDelete}
                 />
             </ModalContent>
@@ -73,12 +82,14 @@ function Body({
     canManage,
     onEdit,
     onApprove,
+    onReapply,
     onDelete,
 }: {
     record: AttendanceRecord;
     canManage: boolean;
     onEdit: (record: AttendanceRecord) => void;
     onApprove: (record: AttendanceRecord) => void;
+    onReapply: (record: AttendanceRecord) => void;
     onDelete: (record: AttendanceRecord) => void;
 }) {
     const employee = record.employee;
@@ -145,11 +156,21 @@ function Body({
                         <span className="text-xs text-muted-foreground">
                             {formatDate(record.work_date)}
                         </span>
+                        {/* The shift and holiday the day was judged by, which
+                            can differ from the ones in force today. */}
                         <span className="text-xs text-muted-foreground">
                             {record.scheduled_start && record.scheduled_end
-                                ? `Shift ${record.scheduled_start}–${record.scheduled_end}`
+                                ? `${record.schedule_name ?? 'Shift'} ${record.scheduled_start}–${record.scheduled_end}`
                                 : 'No shift scheduled'}
                         </span>
+                        {record.holiday && (
+                            <span className="rounded bg-indigo-500/10 px-1.5 py-0.5 text-[11px] text-indigo-600 dark:text-indigo-400">
+                                {record.holiday.name ?? 'Holiday'}
+                                {record.holiday.type === 'special_working'
+                                    ? ' · working holiday'
+                                    : ''}
+                            </span>
+                        )}
                         {record.is_manual && (
                             <span className="rounded bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground">
                                 Recorded by hand
@@ -246,6 +267,18 @@ function Body({
                             <Pencil className="size-4" />
                             {hasRecord ? 'Correct' : 'Record'}
                         </Button>
+                        {hasRecord && (
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                className="text-muted-foreground"
+                                title="Judge this day by the employee's current schedule and the holiday calendar"
+                                onClick={() => onReapply(record)}
+                            >
+                                <RefreshCw className="size-4" />
+                                Re-apply schedule
+                            </Button>
+                        )}
                         {hasRecord && (
                             <Button
                                 variant="ghost"

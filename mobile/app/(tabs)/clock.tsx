@@ -28,7 +28,9 @@ import type { PunchType, TodayResponse } from '@/types/api';
 
 export default function ClockScreen() {
   const { colors, spacing, status, readable } = useTheme();
-  const { user } = useAuth();
+  const { user, organization } = useAuth();
+  // Times read on the organisation's clock, whatever zone the phone is in.
+  const timeZone = organization?.timezone;
   const toast = useToast();
 
   const today = useQuery<TodayResponse>(() => attendanceApi.today(), []);
@@ -92,7 +94,7 @@ export default function ClockScreen() {
       setPendingType(null);
       setJustPunched(done);
       setTimeout(() => setJustPunched(null), 1600);
-      toast.show(`${PUNCH_META[done].label} recorded at ${formatTime(new Date().toISOString())}`, 'success');
+      toast.show(`${PUNCH_META[done].label} recorded at ${formatTime(new Date().toISOString(), timeZone)}`, 'success');
       await today.reload();
     } catch (error) {
       const message = error instanceof ApiError ? error.message : 'Could not record your punch.';
@@ -101,7 +103,7 @@ export default function ClockScreen() {
       setSubmitting(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pendingType, coords, photoUri]);
+  }, [pendingType, coords, photoUri, timeZone]);
 
   const statusMeta = record ? attendanceMeta(record.status) : null;
   // The confirmation flash keeps the punch type's colour, pulled to a shade the tick
@@ -120,10 +122,10 @@ export default function ClockScreen() {
         <Animated.View entering={FadeIn.duration(400)}>
           <Card elevated style={{ alignItems: 'center', paddingVertical: spacing.xl }}>
             <AppText style={{ fontSize: 52, fontWeight: '800', letterSpacing: 1, color: colors.text, fontVariant: ['tabular-nums'] }}>
-              {formatTime(now.toISOString())}
+              {formatTime(now.toISOString(), timeZone)}
             </AppText>
             <AppText variant="label" muted style={{ marginTop: 4 }}>
-              {formatLongDate(now)}
+              {formatLongDate(now, timeZone)}
             </AppText>
 
             {statusMeta && (
@@ -177,7 +179,7 @@ export default function ClockScreen() {
                     {formatElapsed(now.getTime() - new Date(record.first_in_at).getTime())}
                   </AppText>
                   <AppText variant="caption" faint>
-                    since {formatTime(record.first_in_at)}
+                    since {formatTime(record.first_in_at, timeZone)}
                   </AppText>
                 </View>
               )}
@@ -187,8 +189,8 @@ export default function ClockScreen() {
             {record && (record.first_in_at || record.last_out_at) && (
               <Card>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                  <SummaryStat label="Time In" value={formatTime(record.first_in_at)} />
-                  <SummaryStat label="Time Out" value={formatTime(record.last_out_at)} />
+                  <SummaryStat label="Time In" value={formatTime(record.first_in_at, timeZone)} />
+                  <SummaryStat label="Time Out" value={formatTime(record.last_out_at, timeZone)} />
                   <SummaryStat label="Worked" value={formatMinutes(record.worked_minutes)} />
                 </View>
                 {record.late_minutes > 0 && (
@@ -278,7 +280,7 @@ export default function ClockScreen() {
       >
         {pendingType && (
           <Animated.View entering={FadeIn} style={{ gap: spacing.md }}>
-            <ConfirmRow icon="time-outline" label="Time" value={formatTime(now.toISOString())} />
+            <ConfirmRow icon="time-outline" label="Time" value={formatTime(now.toISOString(), timeZone)} />
             <ConfirmRow
               icon="location-outline"
               label="Location"

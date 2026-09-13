@@ -7,6 +7,7 @@ export const attendanceRoutes = {
     store: '/attendance',
     export: '/attendance/export',
     approveAll: '/attendance/approve-all',
+    reapplyRange: '/attendance/reapply-schedule',
 
     me: '/attendance/me',
     mePunch: '/attendance/me/punch',
@@ -15,5 +16,7 @@ export const attendanceRoutes = {
     show: (hashid: string) => `/attendance/records/${hashid}`,
     update: (hashid: string) => `/attendance/records/${hashid}`,
     approve: (hashid: string) => `/attendance/records/${hashid}/approve`,
+    reapply: (hashid: string) =>
+        `/attendance/records/${hashid}/reapply-schedule`,
     destroy: (hashid: string) => `/attendance/records/${hashid}`,
 } as const;

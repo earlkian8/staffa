@@ -20,6 +20,8 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
+import { useOrganizationTimeZone } from '@/hooks/use-organization-time-zone';
+import { clockReading, todayIn } from '../constants';
 import { attendanceRoutes } from '../routes';
 import type {
     AttendanceRecord,
@@ -66,16 +68,6 @@ function formatDay(date: string): string {
     });
 }
 
-function localTime(iso: string | null): string {
-    if (!iso) {
-        return '';
-    }
-
-    const d = new Date(iso);
-
-    return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-}
-
 /**
  * Recording a day by hand, or correcting one the clock got wrong.
  *
@@ -116,7 +108,10 @@ function Body({
 }) {
     const isEdit = Boolean(record?.hashid);
     const lockedEmployee = record?.employee ?? null;
-    const today = new Date().toISOString().slice(0, 10);
+    // Times are read and written on the organisation's clock — the server reads
+    // "08:00" back as 08:00 there, whatever zone this browser is in.
+    const timeZone = useOrganizationTimeZone();
+    const today = todayIn(timeZone);
 
     const [employeeId, setEmployeeId] = useState<string>(
         lockedEmployee ? String(lockedEmployee.id) : '',
@@ -124,8 +119,8 @@ function Body({
     const [date, setDate] = useState<string>(record?.work_date ?? today);
     const [times, setTimes] = useState<Times>(() => ({
         ...EMPTY_TIMES,
-        time_in: localTime(record?.first_in_at ?? null),
-        time_out: localTime(record?.last_out_at ?? null),
+        time_in: clockReading(record?.first_in_at ?? null, timeZone),
+        time_out: clockReading(record?.last_out_at ?? null, timeZone),
     }));
     const [remarks, setRemarks] = useState(record?.remarks ?? '');
     const [processing, setProcessing] = useState(false);
@@ -150,8 +145,9 @@ function Body({
 
                 const next = { ...EMPTY_TIMES };
                 (payload.data.punches ?? []).forEach((punch: Punch) => {
-                    next[PUNCH_TO_FIELD[punch.type]] = localTime(
+                    next[PUNCH_TO_FIELD[punch.type]] = clockReading(
                         punch.punched_at,
+                        timeZone,
                     );
                 });
                 setTimes(next);
@@ -162,7 +158,7 @@ function Body({
         return () => {
             active = false;
         };
-    }, [record]);
+    }, [record, timeZone]);
 
     const setField = (field: keyof Times, value: string) =>
         setTimes((prev) => ({ ...prev, [field]: value }));

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Attendance;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Attendance\ReapplyScheduleRequest;
 use App\Http\Requests\Attendance\StoreAttendanceRecordRequest;
 use App\Http\Requests\Attendance\UpdateAttendanceRecordRequest;
 use App\Http\Resources\AttendanceRecordResource;
@@ -15,6 +16,9 @@ use App\Queries\AttendanceStatistics;
 use App\Queries\AttendanceWeeklyQuery;
 use App\Support\ActivityLogger;
 use App\Support\Attendance\AttendanceClock;
+use App\Support\HolidayCalendar;
+use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -163,6 +167,82 @@ class AttendanceController extends Controller
         );
 
         return $this->respond('Attendance approved.');
+    }
+
+    /**
+     * Re-judge one day by the employee's current schedule and the holiday calendar.
+     * A day keeps the rules it opened with (ADR 0036); this is the explicit way
+     * they change, so it is always logged — with the rules that now apply.
+     */
+    public function reapply(AttendanceRecord $attendanceRecord): RedirectResponse
+    {
+        $changed = $this->clock->reapplySchedule($attendanceRecord);
+        $name = $attendanceRecord->employee?->full_name ?? 'employee';
+
+        ActivityLogger::log(
+            event: 'updated',
+            description: "Re-applied the current schedule to {$name}'s attendance on {$attendanceRecord->work_date->format('M j')}",
+            subject: $attendanceRecord,
+            properties: ['changed' => $changed, 'rules' => $attendanceRecord->rules],
+            logName: 'attendance',
+            subjectLabel: $name,
+        );
+
+        return $this->respond(
+            $changed ? 'Day re-judged by the current schedule.' : 'This day already matches the current schedule.',
+            $changed ? 'success' : 'info',
+        );
+    }
+
+    /**
+     * Re-apply current schedules to every recorded day in a period (optionally one
+     * department's) — after a schedule was corrected, or a holiday added late.
+     */
+    public function reapplyRange(ReapplyScheduleRequest $request): RedirectResponse
+    {
+        $from = $request->date('from')->toDateString();
+        $to = $request->date('to')->toDateString();
+        $department = $request->integer('department') ?: null;
+
+        $holidays = HolidayCalendar::inRange(CarbonImmutable::parse($from), CarbonImmutable::parse($to));
+        $total = 0;
+        $changed = 0;
+
+        AttendanceRecord::query()
+            ->whereBetween('work_date', [$from, $to])
+            ->when($department, fn (Builder $query) => $query->whereHas(
+                'employee',
+                fn (Builder $employee) => $employee->where('department_id', $department),
+            ))
+            ->with('employee.workSchedule')
+            ->chunkById(200, function ($records) use ($holidays, &$total, &$changed): void {
+                foreach ($records as $record) {
+                    $total++;
+
+                    if ($this->clock->reapplySchedule($record, $holidays)) {
+                        $changed++;
+                    }
+                }
+            });
+
+        $period = CarbonImmutable::parse($from)->format('M j').($from === $to ? '' : ' – '.CarbonImmutable::parse($to)->format('M j'));
+
+        if ($total > 0) {
+            ActivityLogger::log(
+                event: 'updated',
+                description: "Re-applied current schedules to {$total} attendance ".str('record')->plural($total)." ({$period})",
+                properties: ['from' => $from, 'to' => $to, 'department' => $department, 'records' => $total, 'changed' => $changed],
+                logName: 'attendance',
+                subjectLabel: 'Attendance',
+            );
+        }
+
+        return $this->respond(
+            $total > 0
+                ? "Re-applied to {$total} ".str('day')->plural($total)." — {$changed} changed."
+                : 'No recorded days in that period.',
+            $total > 0 ? 'success' : 'info',
+        );
     }
 
     /**

@@ -11,9 +11,15 @@ use Illuminate\Support\Collection;
 
 /**
  * Derives an {@see AttendanceRecord}'s summary from its punch events and the
- * employee's {@see WorkSchedule}: worked / break minutes, lateness, undertime,
+ * {@see DayRules} frozen onto it: worked / break minutes, lateness, undertime,
  * overtime and the daily status. Pure and side-effect-free apart from mutating
- * the passed record's attributes (the caller persists).
+ * the passed record's attributes (the caller persists) — it never reads the
+ * database, the clock, or the employee's current schedule.
+ *
+ * The shift is read from the record's `scheduled_start_at` / `scheduled_end_at`:
+ * instants worked out in the organisation's zone when the day opened, so a night
+ * shift's 06:00 end is the next morning rather than sixteen hours before it
+ * started (ADR 0036).
  *
  * Time arithmetic is done on UNIX timestamps so it is agnostic to the app's
  * mutable/immutable date setting (the app uses {@see CarbonImmutable}).
@@ -22,9 +28,9 @@ class AttendanceCalculator
 {
     /**
      * Recompute every derived field on the record from its (chronological)
-     * punches. Does not save — the caller does.
+     * punches and the day's rules. Does not save — the caller does.
      */
-    public static function recompute(AttendanceRecord $record, ?WorkSchedule $schedule, bool $onApprovedLeave = false): void
+    public static function recompute(AttendanceRecord $record, DayRules $rules, bool $onApprovedLeave = false): void
     {
         /** @var Collection<int, AttendancePunch> $punches */
         $punches = $record->punches instanceof Collection
@@ -36,20 +42,18 @@ class AttendanceCalculator
 
         [$worked, $break] = self::accumulate($punches);
 
-        $scheduledStart = self::scheduledMoment($record->work_date, $record->scheduled_start);
-        $scheduledEnd = self::scheduledMoment($record->work_date, $record->scheduled_end);
-        $grace = (int) ($schedule?->grace_minutes ?? 0);
-        $requiredMinutes = (int) round((float) ($schedule?->required_hours ?? 8) * 60);
+        $scheduledStart = $record->scheduled_start_at;
+        $scheduledEnd = $record->scheduled_end_at;
 
         $late = ($firstIn && $scheduledStart)
-            ? max(0, self::minutesBetween($scheduledStart->addMinutes($grace), $firstIn))
+            ? max(0, intdiv($firstIn->getTimestamp() - ($scheduledStart->getTimestamp() + $rules->graceMinutes * 60), 60))
             : 0;
 
         $undertime = ($lastOut && $scheduledEnd && $lastOut->lt($scheduledEnd))
             ? self::minutesBetween($lastOut, $scheduledEnd)
             : 0;
 
-        $overtime = max(0, $worked - $requiredMinutes);
+        $overtime = max(0, $worked - $rules->requiredMinutes);
 
         $record->first_in_at = $firstIn;
         $record->last_out_at = $lastOut;
@@ -58,7 +62,25 @@ class AttendanceCalculator
         $record->late_minutes = $late;
         $record->undertime_minutes = $undertime;
         $record->overtime_minutes = $overtime;
-        $record->status = self::status($record, $schedule, $onApprovedLeave, $punches->isNotEmpty());
+        $record->status = self::status($record, $rules, $onApprovedLeave, $punches->isNotEmpty());
+    }
+
+    /**
+     * What a day with no punches is. Excused by approved leave; otherwise a
+     * holiday nobody is expected to work; otherwise a rest day; and only then an
+     * absence. A `special_working` holiday is an ordinary working day.
+     *
+     * Public because the roster queries synthesise a status for days that have no
+     * record, and they must reach the same verdict a record would.
+     */
+    public static function noPunchStatus(DayRules $rules, bool $onApprovedLeave): string
+    {
+        return match (true) {
+            $onApprovedLeave => 'on_leave',
+            $rules->isNonWorkingHoliday() => 'holiday',
+            ! $rules->isWorkingDay => 'day_off',
+            default => 'absent',
+        };
     }
 
     /**
@@ -102,24 +124,15 @@ class AttendanceCalculator
     }
 
     /**
-     * Derive the daily status. No-punch days resolve to day_off / on_leave /
-     * absent; an open day (clocked in, never out) is incomplete; otherwise the
-     * late / undertime flags drive present vs late vs undertime.
-     *
-     * @param  Collection<int, AttendancePunch>  $punches
+     * Derive the daily status. A no-punch day resolves through
+     * {@see noPunchStatus()}; an open day (clocked in, never out) is incomplete;
+     * otherwise the late / undertime flags drive present vs late vs undertime. A
+     * holiday somebody worked is judged like any other day.
      */
-    private static function status(AttendanceRecord $record, ?WorkSchedule $schedule, bool $onApprovedLeave, bool $hasPunches): string
+    private static function status(AttendanceRecord $record, DayRules $rules, bool $onApprovedLeave, bool $hasPunches): string
     {
         if (! $hasPunches) {
-            if ($onApprovedLeave) {
-                return 'on_leave';
-            }
-
-            if (! self::isWorkingDay($record->work_date, $schedule)) {
-                return 'day_off';
-            }
-
-            return 'absent';
+            return self::noPunchStatus($rules, $onApprovedLeave);
         }
 
         if ($record->first_in_at && ! $record->last_out_at) {
@@ -140,7 +153,8 @@ class AttendanceCalculator
     /**
      * Whether the given date is a scheduled working day. Falls back to Mon–Fri
      * when no schedule (or no work_days) is set. Work days are stored as short
-     * names, e.g. ["Mon","Tue",...].
+     * names, e.g. ["Mon","Tue",...]. The date is a calendar date, so its weekday
+     * is the organisation's.
      */
     public static function isWorkingDay(CarbonInterface $date, ?WorkSchedule $schedule): bool
     {
@@ -151,16 +165,6 @@ class AttendanceCalculator
         }
 
         return in_array($date->format('D'), $days, true);
-    }
-
-    /**
-     * Combine the record's date with a stored "HH:MM[:SS]" time into a moment.
-     */
-    private static function scheduledMoment(CarbonInterface $date, ?string $time): ?CarbonInterface
-    {
-        $time = trim((string) $time);
-
-        return $time === '' ? null : $date->copy()->setTimeFromTimeString($time);
     }
 
     /**

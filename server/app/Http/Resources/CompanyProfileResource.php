@@ -27,6 +27,7 @@ class CompanyProfileResource extends JsonResource
             'email' => $this->email,
             'phone' => $this->phone,
             'address' => $this->address,
+            'timezone' => $this->timezone,
             'tin' => $this->tin,
             'sss_employer_no' => $this->sss_employer_no,
             'philhealth_employer_no' => $this->philhealth_employer_no,

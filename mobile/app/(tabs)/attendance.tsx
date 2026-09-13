@@ -12,6 +12,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { AppText } from '@/components/ui/text';
 import { attendanceApi } from '@/features/attendance/api';
 import { MonthCalendar } from '@/features/attendance/components/month-calendar';
+import { useAuth } from '@/lib/auth';
 import { formatMinutes, formatShortDate, formatTime } from '@/lib/format';
 import { attendanceMeta } from '@/lib/status';
 import { useQuery } from '@/lib/use-query';
@@ -33,6 +34,7 @@ type AttData = { records: AttendanceRecord[]; summary: AttendanceSummary };
 export default function AttendanceScreen() {
   const { colors, spacing, status, readable } = useTheme();
   const router = useRouter();
+  const { organization } = useAuth();
 
   const [month, setMonth] = useState(() => {
     const t = new Date();
@@ -170,7 +172,7 @@ export default function AttendanceScreen() {
                   <View style={{ flex: 1 }}>
                     <Pill label={meta.label} color={meta.color} dot />
                     <AppText variant="caption" muted style={{ marginTop: 4 }}>
-                      {record.first_in_at ? `${formatTime(record.first_in_at)} – ${formatTime(record.last_out_at)}` : 'No punches'}
+                      {record.first_in_at ? `${formatTime(record.first_in_at, organization?.timezone)} – ${formatTime(record.last_out_at, organization?.timezone)}` : 'No punches'}
                     </AppText>
                   </View>
                   <AppText variant="label" muted>

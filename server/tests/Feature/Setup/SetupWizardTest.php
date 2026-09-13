@@ -143,6 +143,7 @@ test('the company step saves the profile and records the step', function () {
         'name' => 'Acme Manufacturing',
         'legal_name' => 'Acme Manufacturing Corporation',
         'email' => 'hr@acme.test',
+        'timezone' => 'Asia/Singapore',
         'tin' => '123-456-789-000',
     ])->assertSessionHasNoErrors();
 
@@ -150,6 +151,7 @@ test('the company step saves the profile and records the step', function () {
 
     expect($organization->name)->toBe('Acme Manufacturing')
         ->and($organization->legal_name)->toBe('Acme Manufacturing Corporation')
+        ->and($organization->timezone)->toBe('Asia/Singapore')
         ->and(CompanySetup::statuses($organization)['company'])->toBe(CompanySetup::DONE)
         // Saving a step is not finishing setup.
         ->and($organization->hasFinishedSetup())->toBeFalse();
